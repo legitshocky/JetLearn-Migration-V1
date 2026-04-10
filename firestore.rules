@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - username: string (required)
+    //   - email: string (required, email format)
+    //   - role: string (required, enum: Super Admin, Admin, User, Guest)
+    //   - isActive: boolean (optional)
+    //   - lastLogin: timestamp (optional)
+    //
+    // Collection: migrations
+    // Document ID: {migrationId}
+    // Fields:
+    //   - jlid: string (required)
+    //   - learnerName: string (required)
+    //   - oldTeacher: string (optional)
+    //   - newTeacher: string (required)
+    //   - course: string (required)
+    //   - reason: string (optional)
+    //   - status: string (required)
+    //   - timestamp: timestamp (required)
+    //   - intervenedBy: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Super Admin'] ||
+        (request.auth.token.email == "sourav.pal@jet-learn.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Super Admin' ||
+        (request.auth.token.email == "sourav.pal@jet-learn.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['username', 'email', 'role', 'isActive', 'lastLogin']) &&
+             data.username is string && data.username.size() > 0 && data.username.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.role in ['Super Admin', 'Admin', 'User', 'Guest'];
+    }
+
+    function isValidMigration(data) {
+      return data.jlid is string && data.jlid.size() > 0 &&
+             data.learnerName is string && data.learnerName.size() > 0 &&
+             data.newTeacher is string && data.newTeacher.size() > 0 &&
+             data.course is string && data.course.size() > 0 &&
+             data.status is string &&
+             data.timestamp is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (isSuperAdmin() || (isOwner(userId) && request.resource.data.role == 'Guest'));
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (isSuperAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+      allow delete: if isSuperAdmin();
+    }
+
+    match /migrations/{migrationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidMigration(request.resource.data);
+      allow update: if isAdmin() && isValidMigration(request.resource.data);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+  }
+}

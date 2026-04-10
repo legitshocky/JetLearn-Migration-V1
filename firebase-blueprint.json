@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user profile",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["Super Admin", "Admin", "User", "Guest"] },
+        "isActive": { "type": "boolean" },
+        "lastLogin": { "type": "string", "format": "date-time" }
+      },
+      "required": ["username", "email", "role"]
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Teacher profile and skills",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "status": { "type": "string" },
+        "manager": { "type": "string" },
+        "clsManager": { "type": "string" },
+        "upskilledCourses": { "type": "array", "items": { "type": "string" } },
+        "traits": { "type": "array", "items": { "type": "string" } },
+        "ageGroups": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Migration": {
+      "title": "Migration",
+      "description": "Learner migration record",
+      "type": "object",
+      "properties": {
+        "jlid": { "type": "string" },
+        "learnerName": { "type": "string" },
+        "oldTeacher": { "type": "string" },
+        "newTeacher": { "type": "string" },
+        "course": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "intervenedBy": { "type": "string" }
+      }
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Operational task",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Completed"] },
+        "dueDate": { "type": "string", "format": "date" },
+        "learnerJlid": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/teachers/{teacherId}": {
+      "schema": "Teacher",
+      "description": "Teacher directory"
+    },
+    "/migrations/{migrationId}": {
+      "schema": "Migration",
+      "description": "Migration logs"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Operational tasks"
+    }
+  }
+}
