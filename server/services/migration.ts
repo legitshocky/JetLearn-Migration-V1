@@ -28,7 +28,7 @@ const db = getFirestore(firebaseConfig.firestoreDatabaseId);
 const SPREADSHEET_IDS = {
   MIGRATION: "1xzprj2U6NpJwoevBMvM1DVfIj76wVjAd0ZcMjVC1xMM",
   PERSONA: "1rSweVyLKEwb1xThFHMLoH4xWnrLs8wbRM_61VtRjGww",
-  APP_DATA: "1XxC8Y0sWkBqoOa0Ntw6zhd5EYXTvaTAN4XhIH1hOwDE",
+  AUDIT: "1iNrejNX3HA01UqYEch94HuKLQCffSPofB8KbD4D9sI4",
 };
 
 export class MigrationService {
@@ -40,7 +40,24 @@ export class MigrationService {
     return google.sheets({ version: "v4", auth });
   }
 
+  private static parseDate(dateStr: string): Date {
+    if (!dateStr) return new Date();
+    // Handle DD/MM/YYYY HH:mm:ss
+    const parts = dateStr.split(/[\/\s:]/);
+    if (parts.length >= 3) {
+      const day = parseInt(parts[0]);
+      const month = parseInt(parts[1]) - 1;
+      const year = parseInt(parts[2]);
+      const hour = parts[3] ? parseInt(parts[3]) : 0;
+      const min = parts[4] ? parseInt(parts[4]) : 0;
+      const sec = parts[5] ? parseInt(parts[5]) : 0;
+      return new Date(year, month, day, hour, min, sec);
+    }
+    return new Date(dateStr);
+  }
+
   static async migrateUsers() {
+    console.log("[MigrationService] Starting User migration...");
     const sheets = await this.getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.MIGRATION,
@@ -48,7 +65,10 @@ export class MigrationService {
     });
 
     const rows = response.data.values;
-    if (!rows) return 0;
+    if (!rows) {
+      console.log("[MigrationService] No user rows found.");
+      return 0;
+    }
 
     let count = 0;
     for (const row of rows) {
@@ -64,37 +84,47 @@ export class MigrationService {
       });
       count++;
     }
+    console.log(`[MigrationService] Migrated ${count} users.`);
     return count;
   }
 
   static async migrateMigrations() {
+    console.log("[MigrationService] Starting Migration logs migration...");
     const sheets = await this.getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.APP_DATA,
+      spreadsheetId: SPREADSHEET_IDS.MIGRATION,
       range: "'Audit Log'!A2:L",
     });
 
     const rows = response.data.values;
-    if (!rows) return 0;
+    if (!rows) {
+      console.log("[MigrationService] No migration rows found.");
+      return 0;
+    }
 
     let count = 0;
     for (const row of rows) {
       const [timestamp, action, jlid, learner, oldTeacher, newTeacher, course, status, notes, sessionId, reason, intervenedBy] = row;
-      if (!jlid || !action.includes("Migration")) continue;
+      if (!jlid || !action || !action.includes("Migration")) continue;
 
-      await db.collection("migrations").add({
-        jlid,
-        learnerName: learner,
-        oldTeacher: oldTeacher || null,
-        newTeacher,
-        course,
-        reason: reason || notes || null,
-        status,
-        timestamp: admin.firestore.Timestamp.fromDate(new Date(timestamp)),
-        intervenedBy: intervenedBy || null,
-      });
-      count++;
+      try {
+        await db.collection("migrations").add({
+          jlid,
+          learnerName: learner || "Unknown",
+          oldTeacher: oldTeacher || null,
+          newTeacher: newTeacher || "Unknown",
+          course: course || "Unknown",
+          reason: reason || notes || null,
+          status: status || "Success",
+          timestamp: admin.firestore.Timestamp.fromDate(this.parseDate(timestamp)),
+          intervenedBy: intervenedBy || null,
+        });
+        count++;
+      } catch (err: any) {
+        console.error(`[MigrationService] Error migrating row for ${jlid}:`, err.message);
+      }
     }
+    console.log(`[MigrationService] Migrated ${count} migration logs.`);
     return count;
   }
 }

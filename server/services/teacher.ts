@@ -11,14 +11,14 @@ const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), "google-service-account.js
 const SERVICE_ACCOUNT = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
 
 // Spreadsheet IDs
-const SPREADSHEET_IDS = {
+export const SPREADSHEET_IDS = {
   MIGRATION: "1xzprj2U6NpJwoevBMvM1DVfIj76wVjAd0ZcMjVC1xMM",
   PERSONA:   "1rSweVyLKEwb1xThFHMLoH4xWnrLs8wbRM_61VtRjGww",
   AUDIT:     "1iNrejNX3HA01UqYEch94HuKLQCffSPofB8KbD4D9sI4",
 };
 
 // Sheet names
-const SHEETS = {
+export const SHEETS = {
   TEACHER_DATA:     "Teacher Data",
   COURSE_NAME:      "Course Name",
   TEACHER_COURSES:  "Teacher Courses",
@@ -56,10 +56,15 @@ const TEACHER_NAME_ALIASES: Record<string, string> = {
 };
 
 const HARDCODED_TP_MANAGERS = [
+  "Amruta Gavade",
+  "Manika Singhal",
   "Naureen Fatima",
   "Oorja M Srivastava",
+  "Sakshi Sharma",
   "Sangeeta Sarkar",
   "Sayani Chakraborty",
+  "Shradha Agarwal",
+  "Sudhi Agrawal"
 ];
 
 async function getSheetsClient() {
@@ -73,20 +78,15 @@ async function getSheetsClient() {
 async function getSheetData(spreadsheetId: string, sheetName: string): Promise<any[][]> {
   const key = `${spreadsheetId}_${sheetName}`;
   if (_sheetCache[key]) return _sheetCache[key];
-  try {
-    const sheets = await getSheetsClient();
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `'${sheetName}'`,
-    });
-    const values = response.data.values || [];
-    _sheetCache[key] = values;
-    return values;
-  } catch (e: any) {
-    console.error(`[TeacherService] Sheet read error (${sheetName}):`, e.message);
-    _sheetCache[key] = [];
-    return [];
-  }
+  
+  const sheets = await getSheetsClient();
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `'${sheetName}'`,
+  });
+  const values = response.data.values || [];
+  _sheetCache[key] = values;
+  return values;
 }
 
 // ── Name helpers (mirror GAS exactly) ────────────────────────────────────────
@@ -1047,5 +1047,39 @@ export class TeacherService {
     } catch (e: any) {
       return { success: false, message: e.message };
     }
+  }
+
+  static async checkSheetsHealth() {
+    const results = [];
+    const sheetsToCheck = [
+      { id: SPREADSHEET_IDS.MIGRATION, name: SHEETS.TEACHER_DATA, label: "Migration - Teacher Data" },
+      { id: SPREADSHEET_IDS.MIGRATION, name: SHEETS.COURSE_NAME, label: "Migration - Course Name" },
+      { id: SPREADSHEET_IDS.MIGRATION, name: SHEETS.TEACHER_COURSES, label: "Migration - Teacher Courses" },
+      { id: SPREADSHEET_IDS.PERSONA, name: SHEETS.PERSONA_DATA, label: "Persona - Main Sheet" },
+      { id: SPREADSHEET_IDS.AUDIT, name: "Coding Audit'26", label: "Audit - Coding '26" },
+      { id: SPREADSHEET_IDS.AUDIT, name: "Math Audit'26", label: "Audit - Math '26" },
+      { id: SPREADSHEET_IDS.AUDIT, name: "GCSE Audit'26", label: "Audit - GCSE '26" },
+    ];
+
+    for (const sheet of sheetsToCheck) {
+      try {
+        const data = await getSheetData(sheet.id, sheet.name);
+        results.push({
+          name: sheet.label,
+          status: data.length > 0 ? "Connected" : "Empty/Error",
+          rows: data.length,
+          id: sheet.id.substring(0, 8) + "..."
+        });
+      } catch (e: any) {
+        results.push({
+          name: sheet.label,
+          status: "Disconnected",
+          rows: 0,
+          error: e.message,
+          id: sheet.id.substring(0, 8) + "..."
+        });
+      }
+    }
+    return results;
   }
 }

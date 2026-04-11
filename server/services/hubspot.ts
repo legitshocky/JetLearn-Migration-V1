@@ -227,7 +227,7 @@ export class HubSpotService {
     const dealResult = await this.fetchByJlid(jlid);
     if (!dealResult || !dealResult.success) return dealResult;
 
-    const finalData = { ...dealResult.data };
+    const finalData: any = { ...dealResult.data };
     const ticketResult = await this.fetchLatestMigrationTicket(jlid);
 
     if (ticketResult.found) {
@@ -236,7 +236,7 @@ export class HubSpotService {
       if (ticketResult.reason) finalData.migrationReason = ticketResult.reason;
       if (ticketResult.ticketCourse) finalData.course = ticketResult.ticketCourse;
       if (ticketResult.classDay || ticketResult.classTime) {
-        finalData.ticketSclearechedule = { day: ticketResult.classDay, time: ticketResult.classTime };
+        finalData.ticketSchedule = { day: ticketResult.classDay, time: ticketResult.classTime };
       }
       finalData.source = "Hybrid (Deal + Ticket)";
     } else {

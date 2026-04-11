@@ -189,6 +189,36 @@ export const Dashboard: React.FC = () => {
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-900 mb-4">Teacher Load Overview</h3>
+            <div className="space-y-4">
+              {[
+                { name: "Minha Khan", load: 85, status: "High" },
+                { name: "Aditi Chauhan", load: 62, status: "Optimal" },
+                { name: "Rahul Sharma", load: 45, status: "Low" }
+              ].map((teacher, i) => (
+                <div key={i} className="space-y-1">
+                  <div className="flex justify-between text-[10px] font-bold">
+                    <span className="text-slate-600">{teacher.name}</span>
+                    <span className={teacher.status === 'High' ? 'text-rose-600' : 'text-emerald-600'}>{teacher.load}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full ${teacher.status === 'High' ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${teacher.load}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button 
+              onClick={() => window.location.href = "/teachers/intelligence"}
+              className="w-full mt-4 py-2 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all uppercase tracking-widest"
+            >
+              View Full Load Dashboard
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="font-bold text-slate-900 mb-4">Quick Actions</h3>
             <div className="grid grid-cols-2 gap-3">
               {[

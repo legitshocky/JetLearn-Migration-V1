@@ -9,9 +9,14 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  Download
+  Download,
+  X,
+  Info,
+  User,
+  BookOpen,
+  Calendar
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { collection, query, orderBy, limit, onSnapshot, startAfter, getDocs } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
@@ -20,6 +25,7 @@ export const AuditLog: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, "migrations"), orderBy("timestamp", "desc"), limit(50));
@@ -106,12 +112,13 @@ export const AuditLog: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Course</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Intervened By</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="w-8 h-8 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mx-auto"></div>
                   </td>
                 </tr>
@@ -154,10 +161,18 @@ export const AuditLog: React.FC = () => {
                       <span className="text-sm text-slate-600">{log.intervenedBy}</span>
                     </div>
                   </td>
+                  <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={() => setSelectedLog(log)}
+                      className="text-indigo-600 hover:text-indigo-800 text-[10px] font-black uppercase tracking-widest"
+                    >
+                      View Details
+                    </button>
+                  </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-24 text-center text-slate-400">
+                  <td colSpan={8} className="px-6 py-24 text-center text-slate-400">
                     <History className="w-12 h-12 mx-auto mb-3 opacity-20" />
                     <p className="text-sm">No audit records found matching your filters.</p>
                   </td>
@@ -182,6 +197,67 @@ export const AuditLog: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {selectedLog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[32px] shadow-2xl w-full max-w-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-xl font-black text-slate-800">Migration Details</h2>
+                <button onClick={() => setSelectedLog(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                  <X className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+              <div className="p-8 space-y-8">
+                <div className="flex items-center gap-6">
+                  <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <User className="w-10 h-10" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">{selectedLog.learnerName}</h3>
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">{selectedLog.jlid}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8">
+                  <DetailItem icon={<ArrowRightLeft />} label="Migration Type" value={selectedLog.type} />
+                  <DetailItem icon={<BookOpen />} label="Course" value={selectedLog.course} />
+                  <DetailItem icon={<User />} label="Old Teacher" value={selectedLog.oldTeacher || "N/A"} />
+                  <DetailItem icon={<User />} label="New Teacher" value={selectedLog.newTeacher} />
+                  <DetailItem icon={<Calendar />} label="Date" value={new Date(selectedLog.timestamp).toLocaleString()} />
+                  <DetailItem icon={<Info />} label="Intervened By" value={selectedLog.intervenedBy} />
+                </div>
+
+                {selectedLog.reason && (
+                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Reason for Migration</p>
+                    <p className="text-sm font-bold text-slate-700">{selectedLog.reason}</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
+
+function DetailItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="p-2 bg-slate-50 rounded-xl text-slate-400">
+        {React.cloneElement(icon as React.ReactElement<any>, { className: "w-4 h-4" })}
+      </div>
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+        <p className="text-sm font-bold text-slate-800">{value}</p>
+      </div>
+    </div>
+  );
+}
