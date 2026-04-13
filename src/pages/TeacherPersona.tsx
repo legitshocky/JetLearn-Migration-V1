@@ -1,18 +1,58 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   UserSearch, Search, Filter, Star, Shield, AlertCircle, 
   ChevronRight, Brain, Users, Target, Zap, TrendingUp,
-  X, CheckCircle2, BarChart3, Activity, ArrowRightLeft
+  X, CheckCircle2, BarChart3, Activity, ArrowRightLeft,
+  Book, Clock, Globe
 } from "lucide-react";
 import axios from "axios";
+
+const TIMEZONES = [
+  "(GMT+00:00) London",
+  "(GMT+01:00) Central European Time",
+  "(GMT+02:00) Eastern European Time",
+  "(GMT+03:00) Moscow Standard Time",
+  "(GMT+04:00) Gulf Standard Time",
+  "(GMT+05:30) India Standard Time",
+  "(GMT+08:00) Singapore Standard Time",
+  "(GMT+09:00) Japan Standard Time",
+  "(GMT+10:00) Australian Eastern Time",
+  "(GMT-05:00) Eastern Time",
+  "(GMT-06:00) Central Time",
+  "(GMT-07:00) Mountain Time",
+  "(GMT-08:00) Pacific Time",
+];
 
 export default function TeacherPersona() {
   const [activeTab, setActiveTab] = useState("search");
   const [teacherName, setTeacherName] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [selectedTimezone, setSelectedTimezone] = useState("(GMT+01:00) Central European Time");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedTime, setSelectedTime] = useState("17:00");
+  const [courses, setCourses] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState<any | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
+
+  const showNotification = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const response = await axios.get("/api/courses");
+        setCourses(response.data);
+      } catch (error) {
+        console.error("Failed to fetch courses", error);
+      }
+    };
+    fetchCourses();
+  }, []);
 
   const tabs = [
     { id: "search", label: "Persona Search", icon: Search },
@@ -21,37 +61,54 @@ export default function TeacherPersona() {
   ];
 
   const findSimilar = async () => {
-    if (!teacherName) return;
     setLoading(true);
     try {
-      const response = await axios.get(`/api/teachers/similar/${encodeURIComponent(teacherName)}`);
-      if (response.data.success) {
-        setResults(response.data.data);
+      // If teacher name is provided, use similar endpoint
+      if (teacherName) {
+        const response = await axios.get(`/api/teachers/similar/${encodeURIComponent(teacherName)}`);
+        if (response.data.success) {
+          setResults(response.data.data);
+        } else {
+          setResults([]);
+        }
       } else {
-        // Mock results for demo
-        setResults([
-          { name: "Aditi Chauhan", matchScore: 98, upskillCount: 12, avgClassScore: 78, escalationRisk: "Low", escalationColor: "#10b981" },
-          { name: "Minha Khan", matchScore: 92, upskillCount: 8, avgClassScore: 72, escalationRisk: "Medium", escalationColor: "#f59e0b" },
-          { name: "Rahul Sharma", matchScore: 88, upskillCount: 15, avgClassScore: 75, escalationRisk: "Low", escalationColor: "#10b981" },
-          { name: "Siddharth V.", matchScore: 85, upskillCount: 6, avgClassScore: 68, escalationRisk: "High", escalationColor: "#ef4444" },
-        ]);
+        // Otherwise use search endpoint with filters
+        const response = await axios.post("/api/teachers/search", {
+          currentCourse: selectedCourse,
+          timezone: selectedTimezone,
+          slotDate: selectedDate,
+          slotTime: selectedTime
+        });
+        if (response.data.success) {
+          setResults(response.data.results || []);
+        } else {
+          setResults([]);
+        }
       }
     } catch (error) {
       console.error("Search failed:", error);
-      // Mock results for demo
-      setResults([
-        { name: "Aditi Chauhan", matchScore: 98, upskillCount: 12, avgClassScore: 78, escalationRisk: "Low", escalationColor: "#10b981" },
-        { name: "Minha Khan", matchScore: 92, upskillCount: 8, avgClassScore: 72, escalationRisk: "Medium", escalationColor: "#f59e0b" },
-        { name: "Rahul Sharma", matchScore: 88, upskillCount: 15, avgClassScore: 75, escalationRisk: "Low", escalationColor: "#10b981" },
-        { name: "Siddharth V.", matchScore: 85, upskillCount: 6, avgClassScore: 68, escalationRisk: "High", escalationColor: "#ef4444" },
-      ]);
+      setResults([]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-[100] px-6 py-3 bg-slate-900 text-white rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10"
+          >
+            <Zap className="w-4 h-4 text-indigo-400" />
+            <span className="text-xs font-bold">{notification}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-600 rounded-xl text-white">
@@ -92,31 +149,83 @@ export default function TeacherPersona() {
           >
             <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50">
               <div className="max-w-2xl mx-auto space-y-6">
-                <div className="text-center space-y-2">
-                  <h3 className="text-lg font-bold text-slate-800 flex items-center justify-center gap-2">
-                    <Brain className="w-5 h-5 text-indigo-600" />
-                    Find Similar Teachers
-                  </h3>
-                  <p className="text-sm text-slate-500">Enter a teacher's name to find their best persona matches across the network.</p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="relative md:col-span-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Enter Teacher Name (e.g. Aditi Chauhan)..."
+                      placeholder="Search by Name..."
                       value={teacherName}
                       onChange={(e) => setTeacherName(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 transition-all"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs focus:outline-none focus:border-indigo-500 transition-all"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target Course</label>
+                    <div className="relative">
+                      <Book className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <select 
+                        value={selectedCourse}
+                        onChange={(e) => setSelectedCourse(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-indigo-500 appearance-none transition-all"
+                      >
+                        <option value="">Select Course...</option>
+                        {courses.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Timezone</label>
+                    <div className="relative">
+                      <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <select 
+                        value={selectedTimezone}
+                        onChange={(e) => setSelectedTimezone(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-indigo-500 appearance-none transition-all"
+                      >
+                        {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Slot Date</label>
+                    <div className="relative">
+                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-indigo-500 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Slot Time</label>
+                    <div className="relative">
+                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="time"
+                        value={selectedTime}
+                        onChange={(e) => setSelectedTime(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-indigo-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-center">
                   <button
                     onClick={findSimilar}
-                    disabled={loading || !teacherName}
-                    className="bg-indigo-600 text-white px-8 py-3 rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2"
+                    disabled={loading || (!teacherName && !selectedCourse)}
+                    className="bg-indigo-600 text-white px-12 py-3 rounded-2xl hover:bg-indigo-700 disabled:opacity-50 transition-all font-bold shadow-lg shadow-indigo-500/20 flex items-center gap-2"
                   >
-                    {loading ? "Searching..." : "Find Matches"}
+                    {loading ? "Analyzing Network..." : "Find Persona Matches"}
                     <Target className="w-4 h-4" />
                   </button>
                 </div>
@@ -147,6 +256,13 @@ export default function TeacherPersona() {
                     <div className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold text-slate-500 uppercase">
                       {teacher.upskillCount} Courses
                     </div>
+                    {teacher.slotMatch && teacher.slotMatch !== "—" && (
+                      <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        teacher.slotFullMatch ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                      }`}>
+                        {teacher.slotMatch}
+                      </div>
+                    )}
                     <div className="flex items-center gap-1 text-amber-500">
                       <Star className="w-3 h-3 fill-current" />
                       <span className="text-[10px] font-bold">Top Tier</span>
@@ -156,12 +272,12 @@ export default function TeacherPersona() {
                   <div className="space-y-3 mb-8">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Audit Grade</span>
-                      <span className="text-xs font-bold text-slate-700">{teacher.avgClassScore ? `${teacher.avgClassScore}/80` : 'N/A'}</span>
+                      <span className="text-xs font-bold text-slate-700">{teacher.avgClassScoreDisplay || (teacher.avgClassScore ? `${teacher.avgClassScore}/80` : 'N/A')}</span>
                     </div>
                     <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-indigo-500 rounded-full" 
-                        style={{ width: `${(teacher.avgClassScore / 80) * 100}%` }}
+                        style={{ width: `${(Number(teacher.avgClassScore) / 80) * 100}%` }}
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -308,12 +424,13 @@ export default function TeacherPersona() {
         isOpen={!!selectedTeacher} 
         onClose={() => setSelectedTeacher(null)} 
         teacher={selectedTeacher} 
+        showNotification={showNotification}
       />
     </div>
   );
 }
 
-function TeacherProfileModal({ isOpen, onClose, teacher }: { isOpen: boolean; onClose: () => void; teacher: any }) {
+function TeacherProfileModal({ isOpen, onClose, teacher, showNotification }: { isOpen: boolean; onClose: () => void; teacher: any; showNotification: (msg: string) => void }) {
   if (!isOpen || !teacher) return null;
 
   return (
@@ -373,14 +490,41 @@ function TeacherProfileModal({ isOpen, onClose, teacher }: { isOpen: boolean; on
 
             <div className="space-y-6">
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                <Zap className="w-5 h-5 text-indigo-600" /> Expertise & Traits
+                <Zap className="w-5 h-5 text-indigo-600" /> Expertise & Availability
               </h3>
-              <div className="flex flex-wrap gap-3">
-                {["Python L1-L3", "Scratch Advanced", "Math Logic", "Focused Communicator", "Storyteller", "Patient Mentor", "Engaging"].map((tag) => (
-                  <span key={tag} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-2xl text-xs font-bold border border-indigo-100">
-                    {tag}
-                  </span>
-                ))}
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-3">
+                  {teacher.courses?.split(",").map((tag: string) => (
+                    <span key={tag} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-2xl text-xs font-bold border border-indigo-100">
+                      {tag.trim()}
+                    </span>
+                  )) || ["Python L1-L3", "Scratch Advanced", "Math Logic"].map(tag => (
+                    <span key={tag} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-2xl text-xs font-bold border border-indigo-100">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                
+                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Clock className="w-3 h-3" /> Weekly Availability
+                    </div>
+                    <div className="text-[10px] font-bold text-indigo-600">{teacher.timezone || "GMT+5:30"}</div>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {["M", "T", "W", "T", "F", "S", "S"].map((day, i) => (
+                      <div key={i} className="space-y-2 text-center">
+                        <div className="text-[8px] font-black text-slate-400">{day}</div>
+                        <div className={`h-12 rounded-lg ${i < 5 ? "bg-indigo-100 border border-indigo-200" : "bg-slate-100"} flex flex-col items-center justify-center gap-1`}>
+                          {i < 5 && <div className="w-1 h-1 bg-indigo-400 rounded-full" />}
+                          {i < 5 && <div className="w-1 h-1 bg-indigo-400 rounded-full" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium italic text-center">Available for 12 more slots this week.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -390,9 +534,15 @@ function TeacherProfileModal({ isOpen, onClose, teacher }: { isOpen: boolean; on
               <h4 className="text-lg font-black leading-tight">Match Recommendation</h4>
               <div className="text-4xl font-black">{teacher.matchScore}%</div>
               <p className="text-indigo-100 text-xs font-medium leading-relaxed">
-                Highly recommended for learners migrating from Minha Khan due to identical teaching personas and course expertise.
+                {teacher.matchReason || `Highly recommended for learners interested in ${teacher.courses?.split(",")[0] || "Python"} due to exceptional engagement scores.`}
               </p>
-              <button className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-all">
+              <button 
+                onClick={() => {
+                  showNotification(`Teacher ${teacher.name} selected for migration workflow.`);
+                  onClose();
+                }}
+                className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-all"
+              >
                 Select Teacher
               </button>
             </div>

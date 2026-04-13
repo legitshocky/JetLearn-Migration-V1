@@ -6,29 +6,178 @@ import {
   CheckCircle, ChevronRight, Info, LayoutDashboard, UserPlus, 
   Bot, Users, RefreshCw, Plus, Trash2, Calendar, Mail,
   TrendingUp, BarChart3, Activity, X, Star, Zap, Filter, Eye,
-  ArrowRight, Download, MessageSquare, AlertCircle, ArrowRightLeft
+  ArrowRight, Download, MessageSquare, AlertCircle, ArrowRightLeft,
+  ExternalLink, MapPin, ShieldCheck, CheckSquare, FileText, CheckCircle2
 } from "lucide-react";
 import axios from "axios";
+import { useAuth } from "../lib/AuthContext";
 
 export default function TeacherIntelligence() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("load");
   const [searchParams, setSearchParams] = useSearchParams();
   const [teacherName, setTeacherName] = useState(searchParams.get("name") || "");
   const [loading, setLoading] = useState(false);
   const [teacherData, setTeacherData] = useState<any | null>(null);
   const [teachers, setTeachers] = useState<string[]>([]);
+  const [tpManager, setTpManager] = useState("");
+  const [tpManagers, setTpManagers] = useState<string[]>([]);
+  const [tpDashboardData, setTpDashboardData] = useState<any | null>(null);
+  const [expandedTeacher, setExpandedTeacher] = useState<string | null>(null);
+  const [teacherNotes, setTeacherNotes] = useState<any[]>([]);
+  const [upskillTasks, setUpskillTasks] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [replacementResults, setReplacementResults] = useState<any[]>([]);
+  const [replacementSearch, setReplacementSearch] = useState("");
+  const [replacementFilters, setReplacementFilters] = useState({
+    currentCourse: "",
+    learnerAge: "",
+    slotDate: new Date().toISOString().split('T')[0],
+    slotTime: "17:00"
+  });
+  const [courses, setCourses] = useState<string[]>([]);
+  const [notification, setNotification] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiStats, setAiStats] = useState({
+    avgBurnoutRisk: 12,
+    highRiskTeachers: 8,
+    sentimentScore: 88,
+    loadVelocity: [45, 60, 85, 95, 75, 40, 30, 55, 80, 98, 70, 50, 65, 88, 42]
+  });
+
+  const showNotification = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const fetchAiStats = async () => {
+    try {
+      const res = await axios.get("/api/ai/dashboard-stats");
+      if (res.data.success) {
+        setAiStats({
+          avgBurnoutRisk: res.data.avgBurnoutRisk,
+          highRiskTeachers: res.data.highRiskTeachers,
+          sentimentScore: res.data.sentimentScore,
+          loadVelocity: res.data.loadVelocity || aiStats.loadVelocity
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch AI stats:", error);
+    }
+  };
+
+  const runAnalysis = async () => {
+    setAnalyzing(true);
+    await fetchAiStats();
+    setAnalyzing(false);
+    showNotification("AI Analysis complete. Predictive models updated.");
+  };
 
   useEffect(() => {
-    const fetchTeacherNames = async () => {
+    const fetchMetadata = async () => {
       try {
-        const response = await axios.get("/api/teachers/names");
-        setTeachers(response.data);
+        const [namesRes, tpRes, coursesRes] = await Promise.all([
+          axios.get("/api/teachers/names"),
+          axios.get("/api/managers/tp"),
+          axios.get("/api/courses")
+        ]);
+        setTeachers(namesRes.data);
+        setTpManagers(tpRes.data);
+        setCourses(coursesRes.data);
       } catch (error) {
-        console.error("Failed to fetch teacher names:", error);
+        console.error("Failed to fetch metadata:", error);
       }
     };
-    fetchTeacherNames();
+    fetchMetadata();
+    fetchAiStats();
   }, []);
+
+  const loadTPDashboard = async (manager: string) => {
+    if (!manager) return;
+    setLoading(true);
+    try {
+      const response = await axios.get(`/api/teachers/tp-dashboard/${encodeURIComponent(manager)}`);
+      if (response.data.success) {
+        setTpDashboardData(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to load TP dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleTeacherDetails = async (teacherName: string) => {
+    if (expandedTeacher === teacherName) {
+      setExpandedTeacher(null);
+      return;
+    }
+    setExpandedTeacher(teacherName);
+    setTeacherNotes([]);
+    setUpskillTasks([]);
+    
+    try {
+      const [notesRes, tasksRes] = await Promise.all([
+        axios.get(`/api/teachers/notes/${encodeURIComponent(teacherName)}`),
+        axios.get(`/api/teachers/upskill/${encodeURIComponent(teacherName)}`)
+      ]);
+      setTeacherNotes(notesRes.data.notes || []);
+      setUpskillTasks(tasksRes.data.tasks || []);
+    } catch (error) {
+      console.error("Failed to fetch teacher details:", error);
+    }
+  };
+
+  const saveNote = async (teacherName: string) => {
+    if (!newNote.trim() || !user) return;
+    setSavingNote(true);
+    try {
+      await axios.post("/api/teachers/notes", {
+        teacherName,
+        tpManager: tpManager,
+        noteText: newNote,
+        createdBy: user.displayName || user.email
+      });
+      setNewNote("");
+      const res = await axios.get(`/api/teachers/notes/${encodeURIComponent(teacherName)}`);
+      setTeacherNotes(res.data.notes || []);
+    } catch (error) {
+      console.error("Failed to save note:", error);
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const updateTask = async (taskId: string, teacherName: string, status: string) => {
+    try {
+      await axios.patch(`/api/teachers/upskill/${taskId}`, { status });
+      const res = await axios.get(`/api/teachers/upskill/${encodeURIComponent(teacherName)}`);
+      setUpskillTasks(res.data.tasks || []);
+    } catch (error) {
+      console.error("Failed to update task:", error);
+    }
+  };
+
+  const runReplacementSearch = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post("/api/teachers/search", {
+        techTraits: replacementSearch,
+        currentCourse: replacementFilters.currentCourse,
+        learnerAge: replacementFilters.learnerAge,
+        slotDate: replacementFilters.slotDate,
+        slotTime: replacementFilters.slotTime
+      });
+      if (response.data.success) {
+        setReplacementResults(response.data.results || []);
+      }
+    } catch (error) {
+      console.error("Replacement search failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadTeacherAnalytics = async (name: string) => {
     if (!name) return;
@@ -64,7 +213,21 @@ export default function TeacherIntelligence() {
   ];
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 relative">
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-[100] px-6 py-3 bg-slate-900 text-white rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10"
+          >
+            <Zap className="w-4 h-4 text-indigo-400" />
+            <span className="text-xs font-bold">{notification}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-black text-slate-900 tracking-tight">Teacher Intelligence Center</h1>
         
@@ -177,10 +340,12 @@ export default function TeacherIntelligence() {
                     <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
                       <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Onboarded Courses & Proficiency</h3>
-                        <button className="text-xs font-bold text-indigo-600 hover:underline">View All</button>
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          {teacherData.load.courses?.length || 0} Courses
+                        </div>
                       </div>
-                      <div className="p-6 space-y-6">
-                        {teacherData.profile.courses?.map((course: any, i: number) => (
+                      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                        {teacherData.load.courses?.map((course: any, i: number) => (
                           <div key={i} className="space-y-2">
                             <div className="flex justify-between items-end">
                               <div>
@@ -198,6 +363,140 @@ export default function TeacherIntelligence() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Attrition Risk & Active Pool</h3>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            {teacherData.load.students?.length || 0} Active Students
+                          </span>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Learner</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Deal Value</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Risk (90d)</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Links</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {teacherData.load.students?.map((student: any, i: number) => (
+                              <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="text-sm font-bold text-slate-800">{student.name}</div>
+                                  <div className="text-[10px] text-slate-400 font-medium">
+                                    {student.jlid} • {student.course}
+                                    {student.moduleStartDate && ` • Started: ${new Date(student.moduleStartDate).toLocaleDateString()}`}
+                                  </div>
+                                  {student.timezone && (
+                                    <div className="text-[9px] text-indigo-500 font-bold flex items-center gap-1 mt-0.5">
+                                      <MapPin className="w-2.5 h-2.5" /> {student.timezone}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="space-y-1">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                      student.health === 'Critical' ? 'bg-rose-50 text-rose-600' : 
+                                      student.health === 'Warning' ? 'bg-amber-50 text-amber-600' : 
+                                      'bg-indigo-50 text-indigo-600'
+                                    }`}>
+                                      {student.status}
+                                    </span>
+                                    {student.dealStage && (
+                                      <div className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">
+                                        Stage: {student.dealStage.split("_").join(" ")}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-xs font-bold text-slate-700">
+                                    {student.dealCurrency} {student.dealAmountLocal?.toLocaleString()}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 font-medium">{student.paymentTag} • {student.dealTenureMonths}m</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="space-y-1">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                                      student.health === 'Critical' ? 'bg-rose-50 text-rose-600' : 
+                                      student.health === 'Warning' ? 'bg-amber-50 text-amber-600' : 
+                                      'bg-emerald-50 text-emerald-600'
+                                    }`}>
+                                      {student.health || "Stable"}
+                                    </span>
+                                    {student.healthReason && (
+                                      <div className="text-[8px] text-slate-400 font-bold uppercase truncate max-w-[120px]">
+                                        {student.healthReason}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <a href={student.hubspotLink} target="_blank" rel="noreferrer" className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-all">
+                                      <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Teacher Hours & Schedule</h3>
+                        <Calendar className="w-4 h-4 text-slate-400" />
+                      </div>
+                      <div className="p-6">
+                        {teacherData.load.schedule?.length > 0 ? (
+                          <div className="space-y-4">
+                            {teacherData.load.schedule.map((event: any, i: number) => {
+                              const isAvailability = event.summary.toLowerCase().includes("availability") || event.summary.toLowerCase().includes("teacher hours");
+                              return (
+                                <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                  <div className={`p-2 rounded-xl ${isAvailability ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                    {isAvailability ? <Clock className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="text-sm font-bold text-slate-800">
+                                      {isAvailability ? "Teacher Hours" : event.summary}
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-1">
+                                      <div className="flex items-center gap-1 text-[10px] text-slate-500 font-bold uppercase">
+                                        <Calendar className="w-3 h-3" />
+                                        {new Date(event.start).toLocaleDateString()}
+                                      </div>
+                                      <div className="flex items-center gap-1 text-[10px] text-slate-500 font-bold uppercase">
+                                        <Clock className="w-3 h-3" />
+                                        {new Date(event.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(event.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {event.location && (
+                                    <a href={event.location} target="_blank" rel="noreferrer" className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase text-indigo-600 hover:bg-indigo-50 transition-all">
+                                      Join Class
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-12 text-slate-400 italic text-sm">
+                            No upcoming classes or teacher hours found.
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -274,76 +573,143 @@ export default function TeacherIntelligence() {
             className="space-y-8"
           >
             <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-slate-800">Replacement Engine</h3>
-                  <p className="text-xs text-slate-500 font-medium">Find the perfect match based on teaching persona and expertise.</p>
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-slate-800">Replacement Engine</h3>
+                    <p className="text-xs text-slate-500 font-medium">Find the perfect match based on teaching persona and expertise.</p>
+                  </div>
+                  <button 
+                    onClick={runReplacementSearch}
+                    disabled={loading}
+                    className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Run Search
+                  </button>
                 </div>
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                  <div className="relative flex-1 md:w-80">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Expertise / Traits</label>
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Python, Scratch..."
+                        value={replacementSearch}
+                        onChange={(e) => setReplacementSearch(e.target.value)}
+                        className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Course</label>
+                    <select 
+                      value={replacementFilters.currentCourse}
+                      onChange={(e) => setReplacementFilters({...replacementFilters, currentCourse: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:border-indigo-500 appearance-none"
+                    >
+                      <option value="">Any Course</option>
+                      {courses.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Learner Age</label>
                     <input 
-                      type="text" 
-                      placeholder="Search by name or expertise..."
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:border-indigo-500 transition-all"
+                      type="number" 
+                      placeholder="e.g. 10"
+                      value={replacementFilters.learnerAge}
+                      onChange={(e) => setReplacementFilters({...replacementFilters, learnerAge: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-500 transition-all"
                     />
                   </div>
-                  <button className="p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-2xl border border-slate-100 transition-all">
-                    <Filter className="w-5 h-5" />
-                  </button>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Slot Date</label>
+                    <input 
+                      type="date" 
+                      value={replacementFilters.slotDate}
+                      onChange={(e) => setReplacementFilters({...replacementFilters, slotDate: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-500 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Slot Time</label>
+                    <input 
+                      type="time" 
+                      value={replacementFilters.slotTime}
+                      onChange={(e) => setReplacementFilters({...replacementFilters, slotTime: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-500 transition-all"
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[
-                  { name: "Minha Khan", match: 98, style: "Engaging & Playful", load: "65%", status: "Available", color: "emerald" },
-                  { name: "Rahul Sharma", match: 94, style: "Structured & Technical", load: "42%", status: "Available", color: "emerald" },
-                  { name: "Siddharth V.", match: 88, style: "Patient Mentor", load: "92%", status: "Limited", color: "amber" },
-                ].map((t, i) => (
+                {replacementResults.length > 0 ? replacementResults.map((t, i) => (
                   <div key={i} className="bg-slate-50 rounded-[32px] p-6 border border-slate-100 hover:border-indigo-500/30 hover:shadow-xl transition-all group">
                     <div className="flex justify-between items-start mb-6">
                       <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-indigo-600 text-xl font-black group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                        {t.name.charAt(0)}
+                        {t.teacherName.charAt(0)}
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-black text-indigo-600">{t.match}%</div>
-                        <div className="text-[8px] uppercase font-black text-slate-400 tracking-widest">Match Score</div>
+                        <div className="text-2xl font-black text-indigo-600">{t.auditGrade}</div>
+                        <div className="text-[8px] uppercase font-black text-slate-400 tracking-widest">Audit Grade</div>
                       </div>
                     </div>
 
                     <div className="space-y-4">
                       <div>
-                        <h4 className="font-bold text-slate-800">{t.name}</h4>
+                        <h4 className="font-bold text-slate-800">{t.teacherName}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className={`px-2 py-0.5 bg-${t.color}-100 text-${t.color}-700 rounded text-[8px] font-black uppercase tracking-widest`}>
-                            {t.status}
+                          <span className={`px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[8px] font-black uppercase tracking-widest`}>
+                            {t.upskillCount} Courses
                           </span>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.load} Load</span>
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                            t.slotFullMatch ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            {t.slotMatch}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.currentCourseProgress} Load</span>
                         </div>
                       </div>
 
                       <div className="space-y-3 pt-4 border-t border-slate-200">
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Persona Style</span>
-                          <span className="text-xs font-bold text-slate-600">{t.style}</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Audit Score</span>
+                          <span className="text-xs font-bold text-slate-600">{t.avgClassScoreDisplay || t.avgClassScore}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Expertise</span>
-                          <span className="text-xs font-bold text-slate-600">Python, Scratch</span>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {t.teacherTraits?.slice(0, 3).map((trait: string) => (
+                            <span key={trait} className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[8px] text-slate-500 font-bold uppercase">{trait}</span>
+                          ))}
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 pt-4">
-                        <button className="py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all">
+                        <Link 
+                          to={`/teachers/profile/${encodeURIComponent(t.teacherName)}`}
+                          className="py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all text-center"
+                        >
                           Profile
-                        </button>
-                        <button className="py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/10">
+                        </Link>
+                        <Link
+                          to={`/communication?teacher=${encodeURIComponent(t.teacherName)}`}
+                          className="py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/10 text-center"
+                        >
                           Replace
-                        </button>
+                        </Link>
                       </div>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="col-span-full py-20 text-center space-y-4">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
+                      <UserPlus className="w-8 h-8 text-slate-200" />
+                    </div>
+                    <p className="text-sm text-slate-500">Run a search to find matching teachers.</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -389,8 +755,13 @@ export default function TeacherIntelligence() {
                   Our neural network analyzes over 50+ data points including class sentiment, load velocity, and student retention trends to predict potential performance shifts.
                 </p>
                 <div className="flex items-center gap-4 pt-2">
-                  <button className="bg-white text-indigo-600 px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-xl shadow-black/10 flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4" /> Run New Analysis
+                  <button 
+                    onClick={runAnalysis}
+                    disabled={analyzing}
+                    className="bg-white text-indigo-600 px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-xl shadow-black/10 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${analyzing ? 'animate-spin' : ''}`} /> 
+                    {analyzing ? 'Analyzing...' : 'Run New Analysis'}
                   </button>
                   <button className="bg-indigo-500/30 text-white border border-white/10 px-8 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-all backdrop-blur-sm">
                     View Model Specs
@@ -398,6 +769,12 @@ export default function TeacherIntelligence() {
                 </div>
               </div>
               <Bot className="absolute -right-20 -bottom-20 w-[500px] h-[500px] text-white/5 rotate-12" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <StatCard label="Avg Burnout Risk" value={`${aiStats.avgBurnoutRisk}%`} color="rose" />
+              <StatCard label="High Risk Teachers" value={aiStats.highRiskTeachers} color="amber" />
+              <StatCard label="Sentiment Score" value={`${aiStats.sentimentScore}/100`} color="emerald" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -419,7 +796,7 @@ export default function TeacherIntelligence() {
                   </div>
                 </div>
                 <div className="h-64 flex items-end gap-3">
-                  {[45, 60, 85, 95, 75, 40, 30, 55, 80, 98, 70, 50, 65, 88, 42].map((h, i) => (
+                  {aiStats.loadVelocity.map((h, i) => (
                     <div key={i} className="flex-1 bg-slate-50 rounded-t-2xl relative group">
                       <motion.div 
                         initial={{ height: 0 }}
@@ -482,139 +859,262 @@ export default function TeacherIntelligence() {
             <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm flex flex-wrap items-end gap-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Viewing as</label>
-                <select className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500 w-48">
-                  <option>All Managers</option>
-                  <option>Oorja M Srivastava</option>
-                  <option>Ashita Sethi</option>
+                <select 
+                  value={tpManager}
+                  onChange={(e) => setTpManager(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500 w-48 appearance-none"
+                >
+                  <option value="">Select Manager</option>
+                  {tpManagers.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">From</label>
-                <input type="date" defaultValue="2026-03-01" className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500 w-40" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">To</label>
-                <input type="date" defaultValue="2026-04-11" className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500 w-40" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Grades</label>
-                <select className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500 w-32">
-                  <option>All Grades</option>
-                  <option>Grade A</option>
-                  <option>Grade B</option>
-                  <option>Grade C</option>
-                  <option>Grade D</option>
-                </select>
-              </div>
-              <button className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20">
-                Load Data
+              <button 
+                onClick={() => loadTPDashboard(tpManager)}
+                disabled={loading || !tpManager}
+                className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+              >
+                {loading ? "Loading..." : "Load Data"}
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <StatCard label="Total Teachers" value="482" color="indigo" />
-              <StatCard label="EWS Teachers" value="12" color="rose" />
-              <StatCard label="Avg Audit Score" value="72.4" color="emerald" />
-              <StatCard label="Red Flag Incidents" value="5" color="amber" />
-            </div>
+            {tpDashboardData ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <StatCard label="Total Teachers" value={tpDashboardData.summary.total} color="indigo" />
+                  <StatCard label="EWS Teachers" value={tpDashboardData.summary.ewsCount} color="rose" />
+                  <StatCard label="Avg Audit Score" value={tpDashboardData.summary.avgScore || "—"} color="emerald" />
+                  <StatCard label="Red Flag Incidents" value={tpDashboardData.summary.redFlags} color="amber" />
+                </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-8">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Score Distribution</h3>
-                  <div className="flex items-center gap-4 text-[8px] font-black uppercase tracking-widest text-slate-400">
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-emerald-500 rounded-full" /> A</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full" /> B</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-amber-500 rounded-full" /> C</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-rose-500 rounded-full" /> D</div>
+                <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Teacher Audit Logs</h3>
                   </div>
-                </div>
-                <div className="h-48 flex items-end gap-2">
-                  {[15, 25, 40, 65, 80, 95, 85, 70, 55, 45, 30, 20].map((h, i) => (
-                    <div key={i} className="flex-1 bg-slate-50 rounded-t-lg relative group">
-                      <div 
-                        className={`absolute bottom-0 left-0 right-0 rounded-t-lg transition-all ${h > 74 ? 'bg-emerald-500' : h > 64 ? 'bg-blue-500' : h > 54 ? 'bg-amber-500' : 'bg-rose-500'}`} 
-                        style={{ height: `${h}%` }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">#</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Teacher</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Load</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Last Audit</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Score</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Grade</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Red Flags</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Hidden</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {tpDashboardData.teachers.map((t: any, i: number) => (
+                        <React.Fragment key={i}>
+                          <tr 
+                            onClick={() => toggleTeacherDetails(t.name)}
+                            className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
+                          >
+                            <td className="px-8 py-5 text-[10px] font-bold text-slate-400">{i + 1}</td>
+                            <td className="px-8 py-5">
+                              <div className="font-bold text-slate-800 flex items-center gap-2">
+                                {t.name}
+                                {t.riskScore === 'High' && <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-bold uppercase">{t.email}</div>
+                            </td>
+                            <td className="px-8 py-5">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${t.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {t.status}
+                              </span>
+                            </td>
+                            <td className="px-8 py-5">
+                              <div className="flex items-center gap-2">
+                                <div className="text-sm font-black text-slate-700">{t.liveLoad || 0}</div>
+                                <div className="text-[10px] text-slate-400 font-bold">Learners</div>
+                              </div>
+                            </td>
+                            <td className="px-8 py-5 text-xs font-bold text-slate-500">{t.lastAuditDate || "—"}</td>
+                            <td className="px-8 py-5 text-sm font-black text-slate-700">
+                              {t.lastScore !== null ? `${t.lastScore}/80` : "undefined/80"}
+                            </td>
+                            <td className="px-8 py-5">
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                                t.lastGrade === 'A' ? 'bg-emerald-50 text-emerald-600' :
+                                t.lastGrade === 'B' ? 'bg-indigo-50 text-indigo-600' :
+                                t.lastGrade === 'C' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                              }`}>
+                                {t.lastGrade}
+                              </span>
+                            </td>
+                            <td className="px-8 py-5">
+                              <div className={`flex items-center gap-2 font-bold text-xs ${t.redFlagCount > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                {t.redFlagCount}
+                              </div>
+                            </td>
+                            <td className="px-8 py-5 text-right">
+                              <div className="flex items-center justify-end gap-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${t.isHidden ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                  {t.isHidden ? "Hidden" : "Visible"}
+                                </span>
+                                <ChevronRight className={`w-4 h-4 text-slate-300 transition-transform ${expandedTeacher === t.name ? 'rotate-90' : ''}`} />
+                              </div>
+                            </td>
+                          </tr>
+                          
+                          <AnimatePresence>
+                            {expandedTeacher === t.name && (
+                              <tr>
+                                <td colSpan={9} className="p-0 border-none">
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden bg-slate-50/50"
+                                  >
+                                    <div className="p-10 space-y-10 border-t border-slate-100">
+                                      {/* Audit Details */}
+                                      <div className="space-y-6">
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                          <ShieldCheck className="w-3 h-3" /> Recent Audits
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                          {Object.entries(t.auditsByType).map(([type, audits]: [string, any]) => (
+                                            <div key={type} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                                              <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{type} Audit</span>
+                                                <span className="text-[10px] font-bold text-slate-400">{audits.length} Sessions</span>
+                                              </div>
+                                              <div className="p-4 space-y-3">
+                                                {audits.slice(0, 3).map((audit: any, idx: number) => (
+                                                  <div key={idx} className="flex items-center justify-between text-xs">
+                                                    <div className="space-y-0.5">
+                                                      <p className="font-bold text-slate-700">{audit.learner}</p>
+                                                      <p className="text-[10px] text-slate-400">{audit.date}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                      <p className="font-black text-slate-900">{audit.score}/80</p>
+                                                      <p className={`text-[10px] font-black ${
+                                                        audit.grade === 'A' ? 'text-emerald-500' : 'text-indigo-500'
+                                                      }`}>{audit.grade} Grade</p>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
 
-              <div className="bg-white p-8 rounded-[32px] border border-slate-200 shadow-sm space-y-6">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Manager Performance</h3>
-                <div className="space-y-4">
-                  {[
-                    { name: "Oorja M Srivastava", score: 76.4, count: 124 },
-                    { name: "Ashita Sethi", score: 71.2, count: 98 },
-                    { name: "Rahul K.", score: 68.5, count: 86 },
-                  ].map((m, i) => (
-                    <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{m.name}</span>
-                        <span className="text-xs font-black text-indigo-600">{m.score}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-600" style={{ width: `${m.score}%` }} />
-                      </div>
-                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{m.count} Teachers Managed</div>
-                    </div>
-                  ))}
+                                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                                        {/* Upskill Tasks */}
+                                        <div className="space-y-6">
+                                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <CheckSquare className="w-3 h-3" /> Upskilling Tasks
+                                          </h4>
+                                          <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
+                                            <table className="w-full text-left text-xs">
+                                              <thead className="bg-slate-50 border-b border-slate-100">
+                                                <tr>
+                                                  <th className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest">Learner</th>
+                                                  <th className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest">Gap Courses</th>
+                                                  <th className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest">Status</th>
+                                                  <th className="px-6 py-4"></th>
+                                                </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-slate-50">
+                                                {upskillTasks.length > 0 ? upskillTasks.map((task) => (
+                                                  <tr key={task.id}>
+                                                    <td className="px-6 py-4 font-bold text-slate-700">{task.learner}</td>
+                                                    <td className="px-6 py-4 text-indigo-600 font-bold">{task.gapCourses}</td>
+                                                    <td className="px-6 py-4">
+                                                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                                                        task.status === 'Done' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                                                      }`}>
+                                                        {task.status}
+                                                      </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                      {task.status !== 'Done' && (
+                                                        <button 
+                                                          onClick={(e) => { e.stopPropagation(); updateTask(task.id, t.name, 'Done'); }}
+                                                          className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded-lg transition-colors"
+                                                        >
+                                                          <CheckCircle2 className="w-4 h-4" />
+                                                        </button>
+                                                      )}
+                                                    </td>
+                                                  </tr>
+                                                )) : (
+                                                  <tr>
+                                                    <td colSpan={4} className="px-6 py-8 text-center text-slate-400 font-medium italic">No upskill tasks logged.</td>
+                                                  </tr>
+                                                )}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+
+                                        {/* TP Notes */}
+                                        <div className="space-y-6">
+                                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <FileText className="w-3 h-3" /> TP Notes
+                                          </h4>
+                                          <div className="space-y-4">
+                                            <div className="flex gap-3">
+                                              <input 
+                                                type="text"
+                                                value={newNote}
+                                                onChange={(e) => setNewNote(e.target.value)}
+                                                placeholder="Add a performance note..."
+                                                className="flex-1 px-5 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
+                                              />
+                                              <button 
+                                                onClick={(e) => { e.stopPropagation(); saveNote(t.name); }}
+                                                disabled={savingNote || !newNote.trim()}
+                                                className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                                              >
+                                                Save
+                                              </button>
+                                            </div>
+                                            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                              {teacherNotes.length > 0 ? teacherNotes.map((note) => (
+                                                <div key={note.id} className="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                                                  <div className="flex items-center justify-between">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{note.createdBy}</span>
+                                                    <span className="text-[9px] font-bold text-slate-300">{new Date(note.createdAt).toLocaleDateString()}</span>
+                                                  </div>
+                                                  <p className="text-xs font-bold text-slate-700 leading-relaxed">{note.note}</p>
+                                                </div>
+                                              )) : (
+                                                <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 border-dashed">
+                                                  <p className="text-xs text-slate-400 font-medium italic">No notes found for this teacher.</p>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                </td>
+                              </tr>
+                            )}
+                          </AnimatePresence>
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div className="bg-white p-20 rounded-[32px] border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center space-y-4">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center">
+                  <Users className="w-8 h-8 text-slate-200" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">No Manager Selected</h3>
+                  <p className="text-sm text-slate-500">Select a manager above to view their team's performance dashboard.</p>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Teacher Audit Logs</h3>
-                <button className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all">
-                  <Download className="w-3.5 h-3.5" /> Export Logs
-                </button>
-              </div>
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Teacher</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Score</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Grade</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Red Flags</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Hidden</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {[
-                    { name: "Aditi Chauhan", score: 78, grade: "A", flags: 0, hidden: "No", color: "emerald" },
-                    { name: "Minha Khan", score: 72, grade: "B", flags: 1, hidden: "No", color: "blue" },
-                    { name: "Rahul Sharma", score: 75, grade: "A", flags: 0, hidden: "No", color: "emerald" },
-                    { name: "Siddharth V.", score: 52, grade: "D", flags: 3, hidden: "Yes", color: "rose" },
-                  ].map((t, i) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-8 py-5">
-                        <div className="font-bold text-slate-800">{t.name}</div>
-                      </td>
-                      <td className="px-8 py-5 text-sm font-black text-slate-700">{t.score}</td>
-                      <td className="px-8 py-5">
-                        <span className={`px-3 py-1 bg-${t.color}-50 text-${t.color}-600 rounded-full text-[10px] font-black`}>
-                          {t.grade}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${t.flags > 0 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-400'}`}>
-                          {t.flags}
-                        </div>
-                      </td>
-                      <td className="px-8 py-5 text-xs font-bold text-slate-500">{t.hidden}</td>
-                      <td className="px-8 py-5 text-right">
-                        <button className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-400">
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

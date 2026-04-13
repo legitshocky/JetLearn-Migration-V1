@@ -3,10 +3,14 @@ import {
   Settings as SettingsIcon, Shield, Bell, User, Database, 
   Globe, Key, Mail, ChevronRight, Save, RefreshCw, 
   Lock, Smartphone, CreditCard, Users, History,
-  Webhook, FileJson, Layers, MessageSquare, Calendar
+  Webhook, FileJson, Layers, MessageSquare, Calendar,
+  MoreVertical, Trash2, Check, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import axios from "axios";
+import { db } from "../lib/firebase";
+import { collection, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { useAuth } from "../lib/AuthContext";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("account");
@@ -290,36 +294,109 @@ function NotificationSettings() {
 }
 
 function OrganizationSettings() {
+  const { profile } = useAuth();
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, "users"));
+      const userList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUsers(userList);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateRole = async (userId: string, newRole: string) => {
+    setUpdatingId(userId);
+    try {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, { role: newRole });
+      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } catch (error) {
+      console.error("Error updating role:", error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const isAdmin = profile?.role === "Admin" || profile?.role === "Super Admin";
+
   return (
     <div className="divide-y divide-slate-100">
       <div className="p-8 space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-900">Team Members</h3>
-          <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2">
-            <Users className="w-3.5 h-3.5" /> Invite Member
-          </button>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-slate-900">Team Members</h3>
+            <p className="text-xs text-slate-500">Manage user roles and system access permissions.</p>
+          </div>
+          {isAdmin && (
+            <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2">
+              <Users className="w-3.5 h-3.5" /> Invite Member
+            </button>
+          )}
         </div>
+
         <div className="space-y-3">
-          {[
-            { name: "Sourav Pal", email: "sourav.pal@jet-learn.com", role: "Admin" },
-            { name: "Ashita Sethi", email: "ashita.sethi@jet-learn.com", role: "Manager" },
-            { name: "Oorja M Srivastava", email: "oorja.s@jet-learn.com", role: "Manager" },
-          ].map((member) => (
-            <div key={member.email} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600 font-bold">
-                  {member.name.charAt(0)}
+          {loading ? (
+            <div className="py-12 text-center">
+              <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-4" />
+              <p className="text-sm text-slate-500 font-medium">Loading team members...</p>
+            </div>
+          ) : users.length > 0 ? (
+            users.map((member) => (
+              <div key={member.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600 font-bold">
+                    {member.username?.charAt(0) || member.email?.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">{member.username}</div>
+                    <div className="text-xs text-slate-500">{member.email}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-bold text-slate-900">{member.name}</div>
-                  <div className="text-xs text-slate-500">{member.email}</div>
+                
+                <div className="flex items-center gap-3">
+                  {isAdmin ? (
+                    <select
+                      value={member.role}
+                      disabled={updatingId === member.id}
+                      onChange={(e) => updateRole(member.id, e.target.value)}
+                      className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                    >
+                      <option value="Guest">Guest</option>
+                      <option value="User">User</option>
+                      <option value="Admin">Admin</option>
+                      <option value="Super Admin">Super Admin</option>
+                    </select>
+                  ) : (
+                    <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-600">
+                      {member.role}
+                    </span>
+                  )}
+                  {updatingId === member.id && (
+                    <RefreshCw className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
+                  )}
                 </div>
               </div>
-              <span className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-600">
-                {member.role}
-              </span>
+            ))
+          ) : (
+            <div className="text-center py-8 text-slate-400 text-sm italic">
+              No users found in the system.
             </div>
-          ))}
+          )}
         </div>
       </div>
 

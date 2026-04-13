@@ -6,7 +6,21 @@ import axios from "axios";
 export default function SystemHealth() {
   const [migrating, setMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState<any>(null);
+  const [sheetsHealth, setSheetsHealth] = useState<any[]>([]);
+  const [loadingSheets, setLoadingSheets] = useState(false);
   const [health, setHealth] = useState({ server: "Checking...", db: "Checking...", auth: "Checking..." });
+
+  const fetchSheetsHealth = async () => {
+    setLoadingSheets(true);
+    try {
+      const res = await axios.get("/api/system/health/sheets");
+      setSheetsHealth(res.data);
+    } catch (error) {
+      console.error("Failed to fetch sheets health:", error);
+    } finally {
+      setLoadingSheets(false);
+    }
+  };
 
   React.useEffect(() => {
     const checkHealth = async () => {
@@ -20,6 +34,7 @@ export default function SystemHealth() {
       setHealth(prev => ({ ...prev, db: "Connected", auth: "Operational" }));
     };
     checkHealth();
+    fetchSheetsHealth();
   }, []);
 
   const runMigration = async () => {
@@ -61,6 +76,49 @@ export default function SystemHealth() {
           status={health.auth} 
           icon={<Shield className={health.auth === "Operational" ? "text-green-600" : "text-red-600"} />} 
         />
+      </div>
+
+      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Google Sheets Connectivity</h3>
+            <p className="text-gray-500 mt-1">Status of individual sub-sheets used for data synchronization</p>
+          </div>
+          <button 
+            onClick={fetchSheetsHealth}
+            disabled={loadingSheets}
+            className="p-2 hover:bg-gray-50 rounded-lg transition-all text-indigo-600"
+            title="Refresh Status"
+          >
+            <RefreshCw className={`w-5 h-5 ${loadingSheets ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sheetsHealth.map((sheet, idx) => (
+            <div key={idx} className="p-4 rounded-xl border border-gray-50 bg-gray-50/30 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-800 truncate pr-2" title={sheet.name}>
+                  {sheet.name}
+                </span>
+                <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                  sheet.status === "Connected" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                }`}>
+                  {sheet.status}
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
+                <span>ID: {sheet.id}</span>
+                <span>{sheet.rows} rows</span>
+              </div>
+              {sheet.error && (
+                <div className="text-[10px] text-red-500 mt-1 bg-red-50 p-2 rounded-lg border border-red-100 italic">
+                  {sheet.error}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">

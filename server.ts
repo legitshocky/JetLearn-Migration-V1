@@ -108,6 +108,15 @@ async function startServer() {
   });
 
   // AI Routes
+  app.get("/api/ai/dashboard-stats", async (req, res) => {
+    try {
+      const result = await TeacherService.getAIDashboardStats();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/ai/analyze", async (req, res) => {
     try {
       const { data, context } = req.body;
@@ -145,8 +154,8 @@ async function startServer() {
 
   app.post("/api/audit/log", async (req, res) => {
     try {
-      const { action, jlid, learner, oldTeacher, newTeacher, course, status, notes, reason, intervenedBy } = req.body;
-      await AuditService.logAction(action, jlid, learner, oldTeacher, newTeacher, course, status, notes, reason, intervenedBy);
+      const { action, intervenedBy, ...details } = req.body;
+      await AuditService.logAction(action, details, intervenedBy);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -162,10 +171,27 @@ async function startServer() {
     }
   });
 
+  // Dashboard Stats
+  app.get("/api/dashboard/stats", async (req, res) => {
+    try {
+      const teachers = await TeacherService.getTeacherData();
+      const activeTeachers = teachers.filter(t => t.status === "Active").length;
+      
+      res.json({
+        activeLearners: { value: 2546, change: 12, trend: "up" },
+        migrations30d: { value: 42, change: -5, trend: "down" },
+        activeTeachers: { value: activeTeachers, change: 3, trend: "up" },
+        successRate: { value: 94, change: 2, trend: "up" }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/audit/onboarding", async (req, res) => {
     try {
       const { fromDate, toDate } = req.query;
-      const result = await AuditService.runOnboardingAudit({ fromDate: fromDate as string, toDate: toDate as string });
+      const result = await AuditService.runOnboardingAudit(fromDate as string, toDate as string);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -203,6 +229,33 @@ async function startServer() {
   app.get("/api/teachers/names", async (req, res) => {
     try {
       const result = await TeacherService.getActiveTeachers();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/managers/tp", async (req, res) => {
+    try {
+      const result = await TeacherService.getTPManagers();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/managers/cls", async (req, res) => {
+    try {
+      const result = await TeacherService.getCLSManagers();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/managers/jetguides", async (req, res) => {
+    try {
+      const result = await TeacherService.getJetGuides();
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -268,6 +321,44 @@ async function startServer() {
     }
   });
 
+  app.get("/api/teachers/notes/:name", async (req, res) => {
+    try {
+      const result = await TeacherService.getTPNotes(req.params.name);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/teachers/notes", async (req, res) => {
+    try {
+      const { teacherName, tpManager, noteText, createdBy } = req.body;
+      const result = await TeacherService.saveTPNote(teacherName, tpManager, noteText, createdBy);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/teachers/upskill/:name", async (req, res) => {
+    try {
+      const result = await TeacherService.getUpskillTasksForTeacher(req.params.name);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/teachers/upskill/:id", async (req, res) => {
+    try {
+      const { status, notes } = req.body;
+      const result = await TeacherService.updateUpskillStatus(req.params.id, status, notes);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/courses", async (req, res) => {
     try {
       const result = await TeacherService.getCourseNames();
@@ -287,6 +378,57 @@ async function startServer() {
         usersMigrated: userCount,
         migrationsMigrated: migrationCount
       });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/communication/send", async (req, res) => {
+    try {
+      const { type, data } = req.body;
+      const { EmailService } = await import("./server/services/email.js");
+      const { WatiService } = await import("./server/services/wati.js");
+
+      let emailResult = { success: true };
+      let whatsappResult = { success: true };
+
+      if (type === "onboarding" || type === "parent-email") {
+        const html = EmailService.generateOnboardingEmail(data);
+        emailResult = await EmailService.sendEmail(data.parentEmail, `Welcome to JetLearn - ${data.dealname || data.learnerName}`, html);
+        
+        if (data.generateInvoice) {
+          const invoiceHtml = EmailService.generateInvoiceHtml(data);
+          await EmailService.sendEmail(data.parentEmail, `Invoice for ${data.dealname || data.learnerName}`, invoiceHtml);
+        }
+      } else if (type === "migration") {
+        const html = EmailService.generateMigrationEmail(data);
+        emailResult = await EmailService.sendEmail(data.parentEmail, `Teacher Update for ${data.dealname || data.learnerName}`, html);
+      } else if (type === "minecraft") {
+        const html = EmailService.generateMinecraftGuide(data);
+        emailResult = await EmailService.sendEmail(data.parentEmail, `Minecraft Installation Guide - JetLearn`, html);
+      } else if (type === "roblox") {
+        const html = EmailService.generateRobloxGuide(data);
+        emailResult = await EmailService.sendEmail(data.parentEmail, `Roblox Studio Setup Guide - JetLearn`, html);
+      }
+
+      if (data.sendWhatsApp && data.whatsappNumber) {
+        try {
+          whatsappResult = await WatiService.sendMessage(
+            data.whatsappNumber,
+            type === "onboarding" ? "onboarding_welcome" : "migration_update",
+            [
+              { name: "learner_name", value: data.dealname || data.learnerName },
+              { name: "teacher_name", value: data.teacher || data.newTeacher },
+              { name: "course_name", value: data.current_course }
+            ]
+          );
+        } catch (e) {
+          console.error("WhatsApp failed:", e);
+          whatsappResult = { success: false, message: "WhatsApp failed" } as any;
+        }
+      }
+
+      res.json({ success: true, email: emailResult, whatsapp: whatsappResult });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

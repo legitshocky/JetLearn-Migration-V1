@@ -1,10 +1,16 @@
-import axios from "axios";
+import { google } from "googleapis";
+import fs from "fs";
+import path from "path";
+
+const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), "google-service-account.json");
 
 export class CalendarService {
-  private static getApiKey() {
-    const key = process.env.GOOGLE_API_KEY;
-    if (!key) throw new Error("GOOGLE_API_KEY is not configured");
-    return key;
+  private static async getCalendarClient() {
+    const auth = new google.auth.GoogleAuth({
+      keyFile: SERVICE_ACCOUNT_PATH,
+      scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+    });
+    return google.calendar({ version: "v3", auth });
   }
 
   private static getCalendarId() {
@@ -14,22 +20,44 @@ export class CalendarService {
   }
 
   static async listEvents(timeMin: string, timeMax: string, query?: string) {
-    const apiKey = this.getApiKey();
-    const calendarId = this.getCalendarId();
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+    try {
+      const calendar = await this.getCalendarClient();
+      const calendarId = this.getCalendarId();
 
-    const response = await axios.get(url, {
-      params: {
-        key: apiKey,
+      const response = await calendar.events.list({
+        calendarId,
         timeMin,
         timeMax,
         q: query,
         singleEvents: true,
         orderBy: "startTime",
-      },
-    });
+      });
 
-    return response.data.items;
+      return response.data.items || [];
+    } catch (error: any) {
+      console.error("[CalendarService.listEvents] Error:", error.message);
+      throw error;
+    }
+  }
+
+  static async listAllEvents(timeMin: string, timeMax: string) {
+    try {
+      const calendar = await this.getCalendarClient();
+      const calendarId = this.getCalendarId();
+
+      const response = await calendar.events.list({
+        calendarId,
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: "startTime",
+      });
+
+      return response.data.items || [];
+    } catch (error: any) {
+      console.error("[CalendarService.listAllEvents] Error:", error.message);
+      throw error;
+    }
   }
 
   static async verifySchedule(jlid: string, expectedStartDate: string, expectedEndDate: string) {
@@ -63,6 +91,35 @@ export class CalendarService {
         status: "Error",
         message: error.message
       };
+    }
+  }
+
+  static async checkTeacherAvailability(teacherName: string, slotStart: string, slotEnd: string) {
+    try {
+      const events = await this.listEvents(slotStart, slotEnd, teacherName);
+      
+      const availabilityEvents = events.filter((e: any) => {
+        const summary = (e.summary || "").toLowerCase();
+        return summary.includes("availability") || summary.includes("teacher hours") || summary.includes("available");
+      });
+
+      const classEvents = events.filter((e: any) => {
+        const summary = (e.summary || "").toLowerCase();
+        return !summary.includes("availability") && !summary.includes("teacher hours") && !summary.includes("available");
+      });
+
+      // A teacher is available if they have an availability block AND no conflicting class
+      const hasAvailability = availabilityEvents.length > 0;
+      const hasConflict = classEvents.length > 0;
+
+      return {
+        available: hasAvailability && !hasConflict,
+        hasAvailability,
+        hasConflict,
+        details: hasConflict ? `Conflict: ${classEvents[0].summary}` : hasAvailability ? "Available" : "No availability block"
+      };
+    } catch (error) {
+      return { available: false, error: "Calendar check failed" };
     }
   }
 }

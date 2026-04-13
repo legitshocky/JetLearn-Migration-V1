@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
+        .container { background-color: #ffffff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo { width: 150px; }
+        h1 { color: #4f46e5; font-size: 24px; margin-bottom: 10px; }
+        .welcome-text { font-size: 18px; color: #555; margin-bottom: 30px; }
+        .info-section { background-color: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #4f46e5; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .info-label { font-weight: bold; color: #666; }
+        .info-value { color: #111; }
+        .cta-button { display: block; width: 200px; margin: 30px auto; padding: 15px; background-color: #4f46e5; color: #ffffff !important; text-align: center; text-decoration: none; border-radius: 5px; font-weight: bold; }
+        .footer { text-align: center; font-size: 12px; color: #999; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://www.jetlearn.com/logo.png" alt="JetLearn Logo" class="logo">
+            <h1>Welcome to JetLearn!</h1>
+            <p class="welcome-text">We're thrilled to have {{learnerName}} join our global community of young creators.</p>
+        </div>
+
+        <div class="info-section">
+            <h2 style="font-size: 16px; margin-top: 0;">Class Details</h2>
+            <div class="info-row">
+                <span class="info-label">Learner Name:</span>
+                <span class="info-value">{{learnerName}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Course:</span>
+                <span class="info-value">{{current_course}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Teacher:</span>
+                <span class="info-value">{{teacher}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Start Date:</span>
+                <span class="info-value">{{startDate}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Timezone:</span>
+                <span class="info-value">{{timezone}}</span>
+            </div>
+        </div>
+
+        <p>Your JetGuide, {{jetGuide}}, will be your primary point of contact for any questions regarding the curriculum or schedule.</p>
+
+        <a href="{{zoomLink}}" class="cta-button">Join Your First Class</a>
+
+        <div class="footer">
+            <p>JetLearn B.V. | Amsterdam, Netherlands</p>
+            <p>Empowering the next generation of creators.</p>
+        </div>
+    </div>
+</body>
+</html>

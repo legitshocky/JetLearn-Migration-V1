@@ -6,7 +6,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 import { Communication } from "./pages/Communication";
 import { AuditLog } from "./pages/AuditLog";
-import AuditCenter from "./pages/AuditCenter";
+import { AuditCenter } from "./pages/AuditCenter";
 import History from "./pages/History";
 import Teachers from "./pages/Teachers";
 import TeacherIntelligence from "./pages/TeacherIntelligence";
@@ -25,6 +25,8 @@ import LearnerMigration from "./pages/LearnerMigration";
 import MinecraftEmail from "./pages/MinecraftEmail";
 import RobloxEmail from "./pages/RobloxEmail";
 import MyProfile from "./pages/MyProfile";
+import Support from "./pages/Support";
+import Documentation from "./pages/Documentation";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -223,6 +225,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MyProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/support"
+            element={
+              <ProtectedRoute>
+                <Support />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/documentation"
+            element={
+              <ProtectedRoute>
+                <Documentation />
               </ProtectedRoute>
             }
           />

@@ -24,6 +24,22 @@ import { db } from "../lib/firebase";
 
 type TabType = "onboarding" | "migration" | "parent-email" | "minecraft" | "roblox";
 
+const TIMEZONES = [
+  "(GMT+00:00) London",
+  "(GMT+01:00) Central European Time",
+  "(GMT+02:00) Eastern European Time",
+  "(GMT+03:00) Moscow Standard Time",
+  "(GMT+04:00) Gulf Standard Time",
+  "(GMT+05:30) India Standard Time",
+  "(GMT+08:00) Singapore Standard Time",
+  "(GMT+09:00) Japan Standard Time",
+  "(GMT+10:00) Australian Eastern Time",
+  "(GMT-05:00) Eastern Time",
+  "(GMT-06:00) Central Time",
+  "(GMT-07:00) Mountain Time",
+  "(GMT-08:00) Pacific Time",
+];
+
 export const Communication: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("onboarding");
   const { profile } = useAuth();
@@ -77,27 +93,24 @@ export const Communication: React.FC = () => {
   const [teachers, setTeachers] = useState<string[]>([]);
   const [courses, setCourses] = useState<string[]>([]);
   const [tpManagers, setTpManagers] = useState<string[]>([]);
+  const [clsManagers, setClsManagers] = useState<string[]>([]);
+  const [jetGuides, setJetGuides] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const [tRes, cRes] = await Promise.all([
+        const [tRes, cRes, tpRes, clsRes, jgRes] = await Promise.all([
           axios.get("/api/teachers/names"),
-          axios.get("/api/courses")
+          axios.get("/api/courses"),
+          axios.get("/api/managers/tp"),
+          axios.get("/api/managers/cls"),
+          axios.get("/api/managers/jetguides")
         ]);
         setTeachers(tRes.data);
         setCourses(cRes.data);
-        setTpManagers([
-          "Amruta Gavade", 
-          "Manika Singhal", 
-          "Naureen Fatima", 
-          "Oorja M Srivastava", 
-          "Sakshi Sharma", 
-          "Sangeeta Sarkar", 
-          "Sayani Chakraborty", 
-          "Shradha Agarwal", 
-          "Sudhi Agrawal"
-        ]);
+        setTpManagers(tpRes.data);
+        setClsManagers(clsRes.data);
+        setJetGuides(jgRes.data);
       } catch (e) {
         console.error("Failed to fetch metadata", e);
       }
@@ -119,6 +132,17 @@ export const Communication: React.FC = () => {
     { id: "minecraft", label: "Minecraft Email", icon: Box },
     { id: "roblox", label: "Roblox Email", icon: Gamepad2 },
   ];
+
+  useEffect(() => {
+    const symbol = formData.currency === 'GBP' ? '£' : formData.currency === 'USD' ? '$' : '€';
+    const amount = formData.dealAmount || 0;
+    setFormData(prev => ({
+      ...prev,
+      totalPayable: `${symbol}${amount}`,
+      amountPaid: `${symbol}${amount}`,
+      balanceDue: `${symbol}0.00`
+    }));
+  }, [formData.dealAmount, formData.currency]);
 
   const handleFetchHubSpot = async () => {
     if (!jlid) return;
@@ -180,7 +204,20 @@ export const Communication: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // Log to Firestore
+      // 1. Call backend to send email/whatsapp
+      const response = await axios.post("/api/communication/send", {
+        type: activeTab,
+        data: {
+          ...formData,
+          jlid
+        }
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to send communication");
+      }
+
+      // 2. Log to Firestore
       await addDoc(collection(db, "migrations"), {
         ...formData,
         jlid,
@@ -190,7 +227,6 @@ export const Communication: React.FC = () => {
         intervenedBy: profile?.username
       });
 
-      // In a real app, you'd trigger the email/whatsapp here via backend
       setSuccess("Communication processed and logged successfully!");
     } catch (err: any) {
       setError(err.message);
@@ -229,6 +265,33 @@ export const Communication: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
+        {/* Global JLID Fetch */}
+        <div className="p-8 pb-0">
+          <div className="max-w-md">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Fetch from HubSpot</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={jlid}
+                  onChange={(e) => setJlid(e.target.value)}
+                  placeholder="Enter JLID (e.g. JL12345)"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-all"
+                />
+              </div>
+              <button 
+                type="button"
+                onClick={handleFetchHubSpot}
+                disabled={loading || !jlid}
+                className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20 flex items-center gap-2"
+              >
+                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                {loading ? "..." : "Fetch"}
+              </button>
+            </div>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
           <AnimatePresence mode="wait">
@@ -240,32 +303,8 @@ export const Communication: React.FC = () => {
               className="grid grid-cols-1 md:grid-cols-2 gap-6"
             >
               {(activeTab === "onboarding" || activeTab === "migration") && (
-                <div className="col-span-full mb-4">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Fetch from HubSpot</label>
-                  <div className="flex gap-2 max-w-md">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        value={jlid}
-                        onChange={(e) => setJlid(e.target.value)}
-                        placeholder="Enter JLID (e.g. JL12345)"
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-all"
-                      />
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={handleFetchHubSpot}
-                      disabled={loading || !jlid}
-                      className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/20"
-                    >
-                      {loading ? "..." : "Fetch"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
+                <>
+                  <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Learner Name</label>
                 <input
                   type="text"
@@ -391,6 +430,17 @@ export const Communication: React.FC = () => {
                           <option value="AM">AM</option>
                           <option value="PM">PM</option>
                         </select>
+                        <select 
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm"
+                          value={session.timezone || "(GMT+00:00) London"}
+                          onChange={(e) => {
+                            const newSessions = [...formData.sessions];
+                            newSessions[idx].timezone = e.target.value;
+                            setFormData({ ...formData, sessions: newSessions });
+                          }}
+                        >
+                          {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+                        </select>
                       </div>
                     ))}
                     <button 
@@ -443,6 +493,16 @@ export const Communication: React.FC = () => {
                       <option value="Spreha Jain">Spreha Jain</option>
                       <option value="Satyam Mehra">Satyam Mehra</option>
                       <option value="Sunil Amarnath">Sunil Amarnath</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Timezone</label>
+                    <select 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm"
+                      value={formData.timezone || "(GMT+00:00) London"}
+                      onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                    >
+                      {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
                     </select>
                   </div>
                 </div>
@@ -508,6 +568,17 @@ export const Communication: React.FC = () => {
                       <option value="Teacher change after PRM">Teacher change after PRM</option>
                       <option value="Teacher on Leaves">Teacher on Leaves</option>
                       <option value="Teacher Performance Issue">Teacher Performance Issue</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Timezone</label>
+                    <select 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm"
+                      value={formData.timezone || "(GMT+00:00) London"}
+                      onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                    >
+                      {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
                     </select>
                   </div>
 
@@ -602,8 +673,7 @@ export const Communication: React.FC = () => {
                             setFormData({ ...formData, sessions: newSessions });
                           }}
                         >
-                          <option value="(GMT+00:00) London">(GMT+00:00) London</option>
-                          <option value="(GMT+05:30) India">(GMT+05:30) India</option>
+                          {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
                         </select>
                       </div>
                     ))}
@@ -684,34 +754,17 @@ export const Communication: React.FC = () => {
                         WhatsApp Parent (WATI)
                       </label>
                     </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </>
+            )}
 
               {activeTab === "parent-email" && (
                 <div className="col-span-full space-y-8">
                   <div className="space-y-6">
                     <h3 className="text-lg font-bold text-slate-900 border-b pb-2">Core Onboarding Information</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">JLID</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={jlid}
-                            onChange={(e) => setJlid(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-all"
-                            placeholder="Enter JLID"
-                          />
-                          <button 
-                            type="button"
-                            onClick={handleFetchHubSpot}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Learner Name</label>
                         <input
@@ -795,6 +848,16 @@ export const Communication: React.FC = () => {
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-all"
                         />
                       </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Timezone</label>
+                        <select 
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm"
+                          value={formData.timezone || "(GMT+00:00) London"}
+                          onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                        >
+                          {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -821,12 +884,13 @@ export const Communication: React.FC = () => {
                       </div>
                       <div className="col-span-full space-y-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Timezone</label>
-                        <input
-                          type="text"
-                          value={formData.timezone || "(GMT-12:00) International Date Line West"}
+                        <select
+                          value={formData.timezone || "(GMT+00:00) London"}
                           onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-all"
-                        />
+                        >
+                          {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+                        </select>
                       </div>
                       <div className="col-span-full space-y-4">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Class Schedule</label>
@@ -914,11 +978,7 @@ export const Communication: React.FC = () => {
                             onChange={(e) => setFormData({ ...formData, clsManager: e.target.value })}
                           >
                             <option value="">Select CLS</option>
-                            <option value="Ashita Sethi">Ashita Sethi</option>
-                            <option value="Namrata">Namrata</option>
-                            <option value="Saloni Sharma">Saloni Sharma</option>
-                            <option value="Surabhi L">Surabhi L</option>
-                            <option value="Zainab T">Zainab T</option>
+                            {clsManagers.map(m => <option key={m} value={m}>{m}</option>)}
                           </select>
                         </div>
                         <div className="space-y-1.5">
@@ -940,13 +1000,7 @@ export const Communication: React.FC = () => {
                             onChange={(e) => setFormData({ ...formData, jetGuide: e.target.value })}
                           >
                             <option value="">Select JetGuide</option>
-                            <option value="Abhishek Nayak">Abhishek Nayak</option>
-                            <option value="Aishwarya Jain">Aishwarya Jain</option>
-                            <option value="Anamika Parmar">Anamika Parmar</option>
-                            <option value="Molishka Rai">Molishka Rai</option>
-                            <option value="Spreha Jain">Spreha Jain</option>
-                            <option value="Satyam Mehra">Satyam Mehra</option>
-                            <option value="Sunil Amarnath">Sunil Amarnath</option>
+                            {jetGuides.map(m => <option key={m} value={m}>{m}</option>)}
                           </select>
                         </div>
                       </div>
@@ -1050,7 +1104,7 @@ export const Communication: React.FC = () => {
                         <input
                           type="text"
                           value={formData.totalPayable || "€0.00"}
-                          readOnly
+                          onChange={(e) => setFormData({ ...formData, totalPayable: e.target.value })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-indigo-600 font-bold"
                         />
                       </div>
@@ -1059,7 +1113,7 @@ export const Communication: React.FC = () => {
                         <input
                           type="text"
                           value={formData.amountPaid || "€0.00"}
-                          readOnly
+                          onChange={(e) => setFormData({ ...formData, amountPaid: e.target.value })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-emerald-600 font-bold"
                         />
                       </div>
@@ -1068,7 +1122,7 @@ export const Communication: React.FC = () => {
                         <input
                           type="text"
                           value={formData.balanceDue || "€0.00"}
-                          readOnly
+                          onChange={(e) => setFormData({ ...formData, balanceDue: e.target.value })}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-emerald-600 font-bold"
                         />
                       </div>

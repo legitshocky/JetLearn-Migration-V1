@@ -67,6 +67,20 @@ const TICKET_PROPERTIES = [
 
 export class HubSpotService {
 
+  // ── Fetch deal by ID ───────────────────────────────────────────────────────
+  static async fetchDealById(dealId: string) {
+    try {
+      const response = await axios.get(
+        `${HUBSPOT_API_URL}/deals/${dealId}?properties=${DEAL_PROPERTIES.join(",")}`,
+        { headers: getHeaders() }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error(`[HubSpotService.fetchDealById] Error for ${dealId}:`, error.message);
+      return null;
+    }
+  }
+
   // ── Fetch deal by JLID ─────────────────────────────────────────────────────
   static async fetchByJlid(jlid: string) {
     const response = await axios.post(
@@ -170,7 +184,7 @@ export class HubSpotService {
         tpManagerHsId: p.teacher_manager || "",
         currency: p.deal_currency_code || "EUR",
         sessionsPerWeek: p.frequency_of_classes || "",
-        timezone: p.time_zone || "",
+        timezone: p.time_zone || "(GMT+00:00) London",
         paymentReceivedDate: p.stage____payment_trigger_date || null,
         installmentTerms: p.installment_terms_final || "",
         churnAlert,
@@ -894,6 +908,8 @@ export class HubSpotService {
           "dealname", "jetlearner_id", "current_course", "module_start_date",
           "learner_status", "dealstage", "amount", "subscription_tenure",
           "deal_currency_code", "payment_type", "installment_type", "subscription",
+          "time_zone", "frequency_of_classes", "learner_health", "learner_health_reason_code",
+          "current_subscription_taken_classes"
         ],
       },
       { headers: getHeaders() }
@@ -918,6 +934,14 @@ export class HubSpotService {
         dealCurrency: currency,
         dealTenureMonths: safeParseNumber(p.subscription_tenure),
         paymentTag: isInstallment ? "Installment" : "Upfront",
+        moduleStartDate: p.module_start_date,
+        dealStage: p.dealstage,
+        timezone: p.time_zone,
+        frequency: p.frequency_of_classes,
+        subscription: p.subscription,
+        health: p.learner_health,
+        healthReason: p.learner_health_reason_code,
+        takenClasses: p.current_subscription_taken_classes
       };
     });
 
