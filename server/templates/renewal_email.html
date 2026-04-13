@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px; border-radius: 24px 24px 0 0; color: white; text-align: center; }
+        .header h1 { margin: 0; font-size: 26px; font-weight: 800; }
+        .header p { margin: 8px 0 0 0; opacity: 0.9; font-size: 15px; }
+        .content { background: white; padding: 40px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 24px 24px; }
+        .info-box { background: #f9fafb; border-radius: 16px; padding: 24px; margin: 24px 0; border: 1px solid #f3f4f6; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .label { font-size: 11px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; }
+        .value { font-size: 15px; font-weight: 700; color: #111827; margin-top: 4px; }
+        .highlight-box { background: #fffbeb; border: 2px solid #f59e0b; border-radius: 16px; padding: 24px; margin: 24px 0; text-align: center; }
+        .highlight-box .amount { font-size: 36px; font-weight: 800; color: #92400e; }
+        .highlight-box .currency { font-size: 18px; font-weight: 700; color: #b45309; }
+        .progress-bar-wrap { background: #e5e7eb; border-radius: 99px; height: 10px; margin: 12px 0 6px; overflow: hidden; }
+        .progress-bar { height: 10px; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #d97706); }
+        .button { display: inline-block; background: #f59e0b; color: white !important; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; margin-top: 24px; font-size: 16px; }
+        .benefit-list { list-style: none; padding: 0; margin: 0; }
+        .benefit-list li { padding: 10px 0; border-bottom: 1px solid #f3f4f6; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+        .benefit-list li:last-child { border-bottom: none; }
+        .star { color: #f59e0b; font-size: 16px; }
+        .footer { text-align: center; font-size: 12px; color: #9ca3af; margin-top: 32px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Time to Renew!</h1>
+        <p>Keep {{learnerName}}'s coding journey going strong</p>
+    </div>
+    <div class="content">
+        <p>Dear <strong>{{parentName}}</strong>,</p>
+        <p>We hope {{learnerName}} has been having a fantastic time learning to code with JetLearn! Their current subscription is approaching its end date and we'd love to continue this journey together.</p>
+
+        <div class="info-box">
+            <p style="margin: 0 0 16px 0; font-weight: 700; font-size: 15px; color: #111827;">Current Subscription</p>
+            <div class="info-grid">
+                <div>
+                    <div class="label">Learner</div>
+                    <div class="value">{{learnerName}}</div>
+                </div>
+                <div>
+                    <div class="label">JLID</div>
+                    <div class="value">{{jlid}}</div>
+                </div>
+                <div>
+                    <div class="label">Current Course</div>
+                    <div class="value">{{current_course}}</div>
+                </div>
+                <div>
+                    <div class="label">Teacher</div>
+                    <div class="value">{{teacher}}</div>
+                </div>
+                <div>
+                    <div class="label">Subscription End</div>
+                    <div class="value">{{subscriptionEndDate}}</div>
+                </div>
+                <div>
+                    <div class="label">Sessions Completed</div>
+                    <div class="value">{{sessionsCompleted}}</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <div class="label">Progress through current plan</div>
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar" style="width: {{progressPercent}}%;"></div>
+                </div>
+                <div style="font-size: 12px; color: #6b7280;">{{progressPercent}}% complete</div>
+            </div>
+        </div>
+
+        <div class="highlight-box">
+            <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 0.05em;">Renewal Price</p>
+            <div><span class="currency">{{currencySymbol}}</span><span class="amount">{{renewalAmount}}</span></div>
+            <p style="margin: 8px 0 0 0; font-size: 13px; color: #b45309;">{{renewalPlan}} · {{renewalTenure}} months · {{sessionsPerWeek}}</p>
+        </div>
+
+        <p style="font-weight: 700; font-size: 15px; color: #111827;">What's included in your renewal</p>
+        <ul class="benefit-list">
+            <li><span class="star">★</span><span>Continue with the same expert teacher, <strong>{{teacher}}</strong></span></li>
+            <li><span class="star">★</span><span>Progress to the next level of <strong>{{nextCourse}}</strong></span></li>
+            <li><span class="star">★</span><span>Priority scheduling and session flexibility</span></li>
+            <li><span class="star">★</span><span>Dedicated JetGuide support from <strong>{{jetGuide}}</strong></span></li>
+            <li><span class="star">★</span><span>Access to all JetLearn learning materials and resources</span></li>
+        </ul>
+
+        <div style="text-align: center;">
+            <a href="{{renewalLink}}" class="button">Renew Now</a>
+        </div>
+
+        <p style="margin-top: 32px; font-size: 13px; color: #6b7280;">
+            To discuss renewal options or payment plans, please contact your CLS Manager: <strong>{{clsManager}}</strong>
+        </p>
+
+        <div class="footer">
+            <p>JetLearn B.V. | Amsterdam, Netherlands | www.jetlearn.com</p>
+            <p>Empowering the next generation of creators.</p>
+        </div>
+    </div>
+</body>
+</html>

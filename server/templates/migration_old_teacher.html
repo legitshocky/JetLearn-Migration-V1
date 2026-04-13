@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 40px; border-radius: 24px 24px 0 0; color: white; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 800; }
+        .header p { margin: 8px 0 0 0; opacity: 0.9; font-size: 14px; }
+        .content { background: white; padding: 40px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 24px 24px; }
+        .info-box { background: #f9fafb; border-radius: 16px; padding: 24px; margin: 24px 0; border: 1px solid #f3f4f6; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .label { font-size: 11px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; }
+        .value { font-size: 15px; font-weight: 700; color: #111827; margin-top: 4px; }
+        .reason-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin: 20px 0; }
+        .reason-box p { margin: 0; font-size: 14px; color: #7f1d1d; }
+        .learner-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: #fee2e2; border-radius: 12px; margin-top: 12px; }
+        .learner-avatar { width: 44px; height: 44px; background: #dc2626; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px; flex-shrink: 0; }
+        .footer { text-align: center; font-size: 12px; color: #9ca3af; margin-top: 32px; }
+        .note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-top: 24px; font-size: 13px; color: #78350f; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Learner Migration Notice</h1>
+        <p>A learner has been transitioned from your roster</p>
+    </div>
+    <div class="content">
+        <p>Dear <strong>{{oldTeacherName}}</strong>,</p>
+        <p>We wanted to inform you that one of your learners, <strong>{{learnerName}}</strong>, has been migrated to a new teacher effective <strong>{{migrationDate}}</strong>. This change was made to ensure the best possible learning outcome for the learner.</p>
+
+        <div class="info-box">
+            <p style="margin: 0 0 16px 0; font-weight: 700; font-size: 15px; color: #111827;">Learner Details</p>
+            <div class="learner-card">
+                <div class="learner-avatar">{{learnerInitial}}</div>
+                <div>
+                    <div style="font-weight: 700; color: #111827;">{{learnerName}}</div>
+                    <div style="font-size: 12px; color: #6b7280;">JLID: {{jlid}}</div>
+                </div>
+            </div>
+            <div class="info-grid" style="margin-top: 20px;">
+                <div>
+                    <div class="label">Course</div>
+                    <div class="value">{{courseName}}</div>
+                </div>
+                <div>
+                    <div class="label">Migration Date</div>
+                    <div class="value">{{migrationDate}}</div>
+                </div>
+                <div>
+                    <div class="label">New Teacher</div>
+                    <div class="value">{{newTeacherName}}</div>
+                </div>
+                <div>
+                    <div class="label">Sessions Completed</div>
+                    <div class="value">{{sessionsCompleted}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="reason-box">
+            <p><strong>Migration Reason:</strong> {{migrationReason}}</p>
+        </div>
+
+        <p>We truly value the effort and dedication you have put into teaching {{learnerName}}. Your contribution to their coding journey has been meaningful and appreciated by the entire JetLearn team.</p>
+
+        <div class="note">
+            <strong>Action Required:</strong> Please ensure all session notes, progress records, and any pending tasks related to {{learnerName}} are up to date in the system before the transition date. This will help the new teacher provide continuity.
+        </div>
+
+        <p style="margin-top: 24px; font-size: 14px; color: #6b7280;">
+            If you have any concerns or questions about this migration, please reach out to your TP Manager: <strong>{{tpManager}}</strong>
+        </p>
+
+        <div class="footer">
+            <p>JetLearn B.V. | Amsterdam, Netherlands | www.jetlearn.com</p>
+        </div>
+    </div>
+</body>
+</html>
