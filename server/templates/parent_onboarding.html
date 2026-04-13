@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+        .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 40px; border-radius: 24px 24px 0 0; color: white; text-align: center; }
+        .header h1 { margin: 0; font-size: 26px; font-weight: 800; }
+        .header p { margin: 8px 0 0 0; opacity: 0.9; font-size: 15px; }
+        .content { background: white; padding: 40px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 24px 24px; }
+        .info-box { background: #f9fafb; border-radius: 16px; padding: 24px; margin: 24px 0; border: 1px solid #f3f4f6; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .label { font-size: 11px; font-weight: 800; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; }
+        .value { font-size: 15px; font-weight: 700; color: #111827; margin-top: 4px; }
+        .teacher-card { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 16px; background: #ede9fe; border-radius: 12px; }
+        .teacher-avatar { width: 44px; height: 44px; background: #4f46e5; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px; flex-shrink: 0; }
+        .invoice-box { background: #fefce8; border: 1px solid #fde68a; border-radius: 16px; padding: 20px; margin: 24px 0; }
+        .invoice-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #fde68a; font-size: 14px; }
+        .invoice-row:last-child { border-bottom: none; font-weight: 800; font-size: 16px; color: #92400e; }
+        .button { display: inline-block; background: #4f46e5; color: white !important; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 700; margin-top: 24px; }
+        .footer { text-align: center; font-size: 12px; color: #9ca3af; margin-top: 32px; }
+        .badge { display: inline-block; background: #d1fae5; color: #065f46; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Welcome to the JetLearn Family!</h1>
+        <p>{{learnerName}} is all set to begin their coding journey</p>
+    </div>
+    <div class="content">
+        <p>Dear <strong>{{parentName}}</strong>,</p>
+        <p>We're delighted to welcome <strong>{{learnerName}}</strong> to JetLearn — the world's best online coding academy for kids. Your child is about to embark on an exciting creative adventure!</p>
+
+        <div class="info-box">
+            <p style="margin: 0 0 16px 0; font-weight: 700; font-size: 15px; color: #111827;">Class Details</p>
+            <div class="info-grid">
+                <div>
+                    <div class="label">Learner Name</div>
+                    <div class="value">{{learnerName}}</div>
+                </div>
+                <div>
+                    <div class="label">JLID</div>
+                    <div class="value">{{jlid}}</div>
+                </div>
+                <div>
+                    <div class="label">Course</div>
+                    <div class="value">{{current_course}}</div>
+                </div>
+                <div>
+                    <div class="label">Start Date</div>
+                    <div class="value">{{startDate}}</div>
+                </div>
+                <div>
+                    <div class="label">Session Day &amp; Time</div>
+                    <div class="value">{{sessionDay}}, {{sessionTime}}</div>
+                </div>
+                <div>
+                    <div class="label">Timezone</div>
+                    <div class="value">{{timezone}}</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <div class="label">Assigned Teacher</div>
+                <div class="teacher-card">
+                    <div class="teacher-avatar">{{teacherInitial}}</div>
+                    <div>
+                        <div style="font-weight: 700; color: #111827;">{{teacher}}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Expert Coding Instructor</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="invoice-box">
+            <p style="margin: 0 0 12px 0; font-weight: 700; font-size: 14px; color: #92400e;">Invoice Summary</p>
+            <div class="invoice-row">
+                <span>Plan</span>
+                <span>{{planName}}</span>
+            </div>
+            <div class="invoice-row">
+                <span>Sessions/Week</span>
+                <span>{{sessionsPerWeek}}</span>
+            </div>
+            <div class="invoice-row">
+                <span>Tenure</span>
+                <span>{{tenure}} months</span>
+            </div>
+            <div class="invoice-row">
+                <span>Payment Type</span>
+                <span>{{paymentType}}</span>
+            </div>
+            <div class="invoice-row">
+                <span>Total Amount</span>
+                <span>{{currencySymbol}}{{dealAmount}}</span>
+            </div>
+        </div>
+
+        <p>Your JetGuide, <strong>{{jetGuide}}</strong>, will be your primary point of contact for any questions about the curriculum or schedule. Don't hesitate to reach out at any time.</p>
+
+        <a href="{{zoomLink}}" class="button">Join First Class via Zoom</a>
+
+        <p style="margin-top: 32px; font-size: 13px; color: #6b7280;">
+            If you have any questions, feel free to contact your CLS Manager: <strong>{{clsManager}}</strong>
+        </p>
+
+        <div class="footer">
+            <p>JetLearn B.V. | Amsterdam, Netherlands | www.jetlearn.com</p>
+            <p>Empowering the next generation of creators.</p>
+        </div>
+    </div>
+</body>
+</html>
