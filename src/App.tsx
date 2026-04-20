@@ -29,7 +29,7 @@ import Support from "./pages/Support";
 import Documentation from "./pages/Documentation";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -39,7 +39,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     );
   }
 
-  if (!user) {
+  if (!user || !profile?.isActive) {
     return <Navigate to="/login" replace />;
   }
 

@@ -1,16 +1,8 @@
 import { google } from "googleapis";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { HubSpotService } from "./hubspot.js";
 import { CalendarService } from "./calendar.js";
 import { CacheManager } from "../lib/cache.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), "google-service-account.json");
-const SERVICE_ACCOUNT = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
+import { getServiceAccount } from "../lib/serviceAccount.js";
 
 // Spreadsheet IDs
 export const SPREADSHEET_IDS = {
@@ -125,8 +117,8 @@ const TIMEZONE_OFFSETS: Record<string, number> = {
 
 async function getSheetsClient() {
   const auth = new google.auth.GoogleAuth({
-    keyFile: SERVICE_ACCOUNT_PATH,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    credentials: getServiceAccount(),
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
   return google.sheets({ version: "v4", auth });
 }
@@ -160,6 +152,11 @@ export function normalizeTeacherName(name: string): string {
 export function resolveTeacherName(name: string): string {
   const key = normalizeTeacherName(name);
   return TEACHER_NAME_ALIASES[key] || String(name || "").trim();
+}
+
+function toBoolean(value: any): boolean {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "true" || normalized === "yes" || normalized === "1";
 }
 
 export class TeacherService {
@@ -1630,5 +1627,188 @@ export class TeacherService {
       }
     }
     return results;
+  }
+
+  static async getUsers() {
+    try {
+      const data = await getSheetData(SPREADSHEET_IDS.MIGRATION, SHEETS.USER_PROFILES);
+      if (data.length < 2) return [];
+
+      return data.slice(1)
+        .map((row: any[]) => {
+          const username = String(row[0] || "").trim();
+          const role = String(row[2] || "User").trim();
+          const email = String(row[3] || "").trim();
+          const isActive = toBoolean(row[4]);
+          if (!username || !email) return null;
+
+          return {
+            id: username,
+            username,
+            role,
+            email,
+            emailLower: email.toLowerCase(),
+            isActive,
+          };
+        })
+        .filter(Boolean);
+    } catch (e: any) {
+      console.error("[TeacherService.getUsers] Error:", e.message);
+      return [];
+    }
+  }
+
+  static async updateUserRole(userId: string, role: string) {
+    try {
+      const sheets = await getSheetsClient();
+      const data = await getSheetData(SPREADSHEET_IDS.MIGRATION, SHEETS.USER_PROFILES);
+      let rowIndex = -1;
+
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0] || "").trim() === userId) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+
+      if (rowIndex === -1) return { success: false, message: "User not found." };
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_IDS.MIGRATION,
+        range: `'${SHEETS.USER_PROFILES}'!C${rowIndex}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [[role]] }
+      });
+
+      CacheManager.delete?.(`sheet_${SPREADSHEET_IDS.MIGRATION}_${SHEETS.USER_PROFILES}`);
+      return { success: true };
+    } catch (e: any) {
+      console.error("[TeacherService.updateUserRole] Error:", e.message);
+      return { success: false, message: e.message };
+    }
+  }
+
+  static async getMigrationLogs(limitCount = 50) {
+    try {
+      const data = await getSheetData(SPREADSHEET_IDS.APP_DATA, SHEETS.MIGRATION_LOG);
+      if (data.length < 2) return [];
+
+      return data.slice(1)
+        .map((r: any[]) => ({
+          id: r[0],
+          timestamp: r[1],
+          action: r[2],
+          jlid: r[3],
+          learnerName: r[4],
+          oldTeacher: r[5] || "",
+          newTeacher: r[6] || "",
+          course: r[7] || "",
+          status: r[8] || "Success",
+          reason: r[9] || "",
+          intervenedBy: r[10] || "",
+          type: r[11] || "migration",
+        }))
+        .filter((row) => row.jlid || row.learnerName)
+        .reverse()
+        .slice(0, limitCount);
+    } catch (e: any) {
+      console.error("[TeacherService.getMigrationLogs] Error:", e.message);
+      return [];
+    }
+  }
+
+  static async logMigrationEntry(entry: any) {
+    try {
+      const sheets = await getSheetsClient();
+      const id = Math.random().toString(36).substring(2, 15);
+      const timestamp = entry.timestamp || new Date().toISOString();
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_IDS.APP_DATA,
+        range: `'${SHEETS.MIGRATION_LOG}'!A:L`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[
+            id,
+            timestamp,
+            entry.action || "Migration",
+            entry.jlid || "",
+            entry.learnerName || entry.dealname || "",
+            entry.oldTeacher || "",
+            entry.newTeacher || entry.teacher || "",
+            entry.course || entry.current_course || "",
+            entry.status || "Success",
+            entry.reason || entry.notes || "",
+            entry.intervenedBy || "",
+            entry.type || "migration",
+          ]]
+        }
+      });
+
+      return { success: true, id };
+    } catch (e: any) {
+      console.error("[TeacherService.logMigrationEntry] Error:", e.message);
+      return { success: false, message: e.message };
+    }
+  }
+
+  static async getEmailActivities(limitCount = 20) {
+    try {
+      const data = await getSheetData(SPREADSHEET_IDS.APP_DATA, SHEETS.EMAIL_LOGS);
+      if (data.length < 2) return [];
+
+      return data.slice(1)
+        .map((r: any[]) => ({
+          id: r[0],
+          timestamp: r[1],
+          type: r[2] || "communication",
+          jlid: r[3] || "",
+          learnerName: r[4] || "",
+          parentEmail: r[5] || "",
+          course: r[6] || "",
+          status: r[7] || "Delivered",
+          subject: r[8] || "",
+          intervenedBy: r[9] || "",
+        }))
+        .filter((row) => row.subject || row.parentEmail || row.learnerName)
+        .reverse()
+        .slice(0, limitCount);
+    } catch (e: any) {
+      console.error("[TeacherService.getEmailActivities] Error:", e.message);
+      return [];
+    }
+  }
+
+  static async logEmailActivity(entry: any) {
+    try {
+      const sheets = await getSheetsClient();
+      const id = Math.random().toString(36).substring(2, 15);
+      const timestamp = entry.timestamp || new Date().toISOString();
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_IDS.APP_DATA,
+        range: `'${SHEETS.EMAIL_LOGS}'!A:J`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[
+            id,
+            timestamp,
+            entry.type || "communication",
+            entry.jlid || "",
+            entry.learnerName || entry.dealname || "",
+            entry.parentEmail || "",
+            entry.course || entry.current_course || "",
+            entry.status || "Delivered",
+            entry.subject || "",
+            entry.intervenedBy || "",
+          ]]
+        }
+      });
+
+      return { success: true, id };
+    } catch (e: any) {
+      console.error("[TeacherService.logEmailActivity] Error:", e.message);
+      return { success: false, message: e.message };
+    }
   }
 }

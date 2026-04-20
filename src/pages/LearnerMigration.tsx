@@ -9,8 +9,6 @@ import {
   ArrowRight, Info, MessageSquare, Mail, Phone
 } from "lucide-react";
 import axios from "axios";
-import { collection, query, orderBy, limit, onSnapshot, addDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
 import { useAuth } from "../lib/AuthContext";
 
 const TIMEZONES = [
@@ -38,9 +36,9 @@ export default function LearnerMigration() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const q = query(collection(db, "migrations"), orderBy("timestamp", "desc"), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const fetchMigrations = async () => {
+      const response = await axios.get("/api/migrations?limit=50");
+      const data = response.data;
       setMigrations(data);
       
       const total = data.length;
@@ -49,14 +47,14 @@ export default function LearnerMigration() {
       const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
       
       setStats({
-        total: total + 142, // Adding some baseline mock stats
-        pending: pending + 5,
-        completed: completed + 137,
-        successRate: `${rate > 0 ? rate : 98}%`
+        total,
+        pending,
+        completed,
+        successRate: `${rate}%`
       });
-    });
+    };
 
-    return () => unsubscribe();
+    fetchMigrations().catch(console.error);
   }, []);
 
   const filteredMigrations = migrations.filter(m => 
@@ -317,16 +315,18 @@ function MigrationWizard({ onClose }: { onClose: () => void }) {
         intervenedBy: profile?.username
       });
 
-      await addDoc(collection(db, "migrations"), {
+      await axios.post("/api/migrations", {
         jlid,
         learnerName: learnerData.learnerName,
         oldTeacher: learnerData.currentTeacher,
         newTeacher: selectedTeacher.name,
         course: learnerData.course,
-        timezone: learnerData.timezone || "(GMT+00:00) London",
         status: "Success",
         timestamp: new Date().toISOString(),
-        intervenedBy: profile?.username
+        intervenedBy: profile?.username,
+        action: "Learner Migration",
+        reason: "Standard Migration",
+        type: "migration"
       });
 
       onClose();

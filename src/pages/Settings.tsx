@@ -8,8 +8,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import axios from "axios";
-import { db } from "../lib/firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { useAuth } from "../lib/AuthContext";
 
 export default function Settings() {
@@ -302,12 +300,8 @@ function OrganizationSettings() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, "users"));
-      const userList = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setUsers(userList);
+      const response = await axios.get("/api/users");
+      setUsers(response.data);
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
@@ -318,8 +312,7 @@ function OrganizationSettings() {
   const updateRole = async (userId: string, newRole: string) => {
     setUpdatingId(userId);
     try {
-      const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, { role: newRole });
+      await axios.patch(`/api/users/${encodeURIComponent(userId)}/role`, { role: newRole });
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (error) {
       console.error("Error updating role:", error);

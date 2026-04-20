@@ -1,29 +1,28 @@
 import { google } from "googleapis";
 import admin from "firebase-admin";
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
+import { getServiceAccount } from "../lib/serviceAccount.js";
+import { createRequire } from "module";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
+const firebaseConfig = require("../../firebase-applet-config.json");
 
-const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), "google-service-account.json");
+import { getFirestore, Firestore } from "firebase-admin/firestore";
 
-import firebaseConfig from "../../firebase-applet-config.json" assert { type: "json" };
+// Lazy Firebase Admin — only initializes on first use, never crashes at module load
+let _db: Firestore | null = null;
 
-import { getFirestore } from "firebase-admin/firestore";
-
-const SERVICE_ACCOUNT = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
-
-// Initialize Firebase Admin
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(SERVICE_ACCOUNT),
-    projectId: firebaseConfig.projectId,
-  });
+function getDb(): Firestore {
+  if (!_db) {
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(getServiceAccount() as admin.ServiceAccount),
+        projectId: firebaseConfig.projectId,
+      });
+    }
+    _db = getFirestore(firebaseConfig.firestoreDatabaseId);
+  }
+  return _db;
 }
-
-const db = getFirestore(firebaseConfig.firestoreDatabaseId);
 
 const SPREADSHEET_IDS = {
   MIGRATION: "1xzprj2U6NpJwoevBMvM1DVfIj76wVjAd0ZcMjVC1xMM",
@@ -34,7 +33,7 @@ const SPREADSHEET_IDS = {
 export class MigrationService {
   private static async getSheetsClient() {
     const auth = new google.auth.GoogleAuth({
-      keyFile: SERVICE_ACCOUNT_PATH,
+      credentials: getServiceAccount(),
       scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
     });
     return google.sheets({ version: "v4", auth });
@@ -42,7 +41,6 @@ export class MigrationService {
 
   private static parseDate(dateStr: string): Date {
     if (!dateStr) return new Date();
-    // Handle DD/MM/YYYY HH:mm:ss
     const parts = dateStr.split(/[\/\s:]/);
     if (parts.length >= 3) {
       const day = parseInt(parts[0]);
@@ -57,6 +55,7 @@ export class MigrationService {
   }
 
   static async migrateUsers() {
+    const db = getDb();
     console.log("[MigrationService] Starting User migration...");
     const sheets = await this.getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
@@ -65,20 +64,15 @@ export class MigrationService {
     });
 
     const rows = response.data.values;
-    if (!rows) {
-      console.log("[MigrationService] No user rows found.");
-      return 0;
-    }
+    if (!rows) { console.log("[MigrationService] No user rows found."); return 0; }
 
     let count = 0;
     for (const row of rows) {
       const [username, password, role, email, isActive] = row;
       if (!username || !email) continue;
-
       await db.collection("users").doc(username).set({
-        username,
-        email,
-        role,
+        username, email, role,
+        emailLower: String(email).trim().toLowerCase(),
         isActive: isActive === "TRUE" || isActive === true,
         lastLogin: null,
       });
@@ -89,6 +83,7 @@ export class MigrationService {
   }
 
   static async migrateMigrations() {
+    const db = getDb();
     console.log("[MigrationService] Starting Migration logs migration...");
     const sheets = await this.getSheetsClient();
     const response = await sheets.spreadsheets.values.get({
@@ -97,16 +92,12 @@ export class MigrationService {
     });
 
     const rows = response.data.values;
-    if (!rows) {
-      console.log("[MigrationService] No migration rows found.");
-      return 0;
-    }
+    if (!rows) { console.log("[MigrationService] No migration rows found."); return 0; }
 
     let count = 0;
     for (const row of rows) {
       const [timestamp, action, jlid, learner, oldTeacher, newTeacher, course, status, notes, sessionId, reason, intervenedBy] = row;
       if (!jlid || !action || !action.includes("Migration")) continue;
-
       try {
         await db.collection("migrations").add({
           jlid,
@@ -126,5 +117,47 @@ export class MigrationService {
     }
     console.log(`[MigrationService] Migrated ${count} migration logs.`);
     return count;
+  }
+
+  static async lookupUserByUsername(username: string): Promise<{ email: string; isActive: boolean } | null> {
+    const sheets = await this.getSheetsClient();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.MIGRATION,
+      range: "'User Profiles'!A2:E",
+    });
+
+    const rows = response.data.values || [];
+    const normalizedUsername = String(username || "").trim().toLowerCase();
+    const row = rows.find((r: any[]) => String(r[0] || "").trim().toLowerCase() === normalizedUsername);
+    if (!row) return null;
+
+    return {
+      email: String(row[3] || "").trim(),
+      isActive: String(row[4] || "").trim().toLowerCase() === "true",
+    };
+  }
+
+  static async getUserProfileByEmail(email: string) {
+    const trimmedEmail = String(email || "").trim().toLowerCase();
+    if (!trimmedEmail) return null;
+
+    const sheets = await this.getSheetsClient();
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.MIGRATION,
+      range: "'User Profiles'!A2:E",
+    });
+
+    const rows = response.data.values || [];
+    const row = rows.find((r: any[]) => String(r[3] || "").trim().toLowerCase() === trimmedEmail);
+    if (!row) return null;
+
+    return {
+      id: String(row[0] || "").trim(),
+      username: String(row[0] || "").trim(),
+      email: String(row[3] || "").trim(),
+      role: String(row[2] || "User").trim(),
+      isActive: String(row[4] || "").trim().toLowerCase() === "true",
+      lastLogin: null,
+    };
   }
 }

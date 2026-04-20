@@ -1,13 +1,10 @@
 import { google } from "googleapis";
-import fs from "fs";
-import path from "path";
-
-const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), "google-service-account.json");
+import { getServiceAccount } from "../lib/serviceAccount.js";
 
 export class CalendarService {
   private static async getCalendarClient() {
     const auth = new google.auth.GoogleAuth({
-      keyFile: SERVICE_ACCOUNT_PATH,
+      credentials: getServiceAccount(),
       scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
     });
     return google.calendar({ version: "v3", auth });

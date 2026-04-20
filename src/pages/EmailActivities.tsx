@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Mail, Send, CheckCircle, Clock, Search, Filter, Eye, AlertCircle } from "lucide-react";
-import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { Mail, CheckCircle, Clock, Search, Filter, Eye } from "lucide-react";
+import axios from "axios";
 
 export default function EmailActivities() {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "migrations"), orderBy("timestamp", "desc"), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setActivities(data);
+    const fetchActivities = async () => {
+      const response = await axios.get("/api/email-activities?limit=20");
+      setActivities(response.data);
       setLoading(false);
-    });
-    return () => unsubscribe();
+    };
+
+    fetchActivities().catch(() => setLoading(false));
   }, []);
 
   return (
@@ -56,18 +55,18 @@ export default function EmailActivities() {
                 <div className="flex-1 min-width-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="text-sm font-bold text-slate-900 truncate">
-                      {activity.type === 'onboarding' ? 'Onboarding Email' : 'Migration Update'}
+                      {activity.subject || (activity.type === "onboarding" ? "Onboarding Email" : "Migration Update")}
                     </h4>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded uppercase tracking-wider">
                       {activity.jlid}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 truncate">
-                    Sent to {activity.learnerName} · {activity.course}
+                    Sent to {activity.parentEmail || activity.learnerName} - {activity.course}
                   </p>
                   <div className="flex items-center gap-3 mt-2">
                     <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
-                      <CheckCircle className="w-3 h-3" /> Delivered
+                      <CheckCircle className="w-3 h-3" /> {activity.status || "Delivered"}
                     </span>
                     <span className="text-[10px] text-slate-400 flex items-center gap-1">
                       <Clock className="w-3 h-3" /> {new Date(activity.timestamp).toLocaleString()}

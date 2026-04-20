@@ -21,8 +21,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import axios from "axios";
 
 export const AuditLog: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
@@ -32,14 +31,14 @@ export const AuditLog: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, "migrations"), orderBy("timestamp", "desc"), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const fetchLogs = async () => {
+      const response = await axios.get("/api/migrations?limit=50");
+      const data = response.data;
       setLogs(data);
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchLogs().catch(() => setLoading(false));
   }, []);
 
   const filteredLogs = logs.filter(log => {

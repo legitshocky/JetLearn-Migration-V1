@@ -19,8 +19,6 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import axios from "axios";
 import { useAuth } from "../lib/AuthContext";
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
 
 type TabType = "onboarding" | "migration" | "parent-email" | "minecraft" | "roblox";
 
@@ -217,15 +215,20 @@ export const Communication: React.FC = () => {
         throw new Error(response.data.message || "Failed to send communication");
       }
 
-      // 2. Log to Firestore
-      await addDoc(collection(db, "migrations"), {
-        ...formData,
-        jlid,
-        type: activeTab,
-        status: "Success",
-        timestamp: new Date().toISOString(),
-        intervenedBy: profile?.username
-      });
+      if (activeTab === "migration") {
+        await axios.post("/api/migrations", {
+          ...formData,
+          jlid,
+          learnerName: formData.dealname,
+          newTeacher: formData.newTeacher || formData.teacher,
+          course: formData.current_course,
+          type: activeTab,
+          status: "Success",
+          timestamp: new Date().toISOString(),
+          intervenedBy: profile?.username,
+          action: "Migration Communication",
+        });
+      }
 
       setSuccess("Communication processed and logged successfully!");
     } catch (err: any) {
