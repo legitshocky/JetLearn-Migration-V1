@@ -2,7 +2,8 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { createApp } from "./server/createApp.js";
 
-dotenv.config();
+dotenv.config({ path: ".env.local" });
+dotenv.config(); // fallback to .env for any vars not in .env.local
 
 async function startServer() {
   const app = createApp();
