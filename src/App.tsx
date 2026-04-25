@@ -27,6 +27,8 @@ import RobloxEmail from "./pages/RobloxEmail";
 import MyProfile from "./pages/MyProfile";
 import Support from "./pages/Support";
 import Documentation from "./pages/Documentation";
+import Certificates from "./pages/Certificates";
+import Invoices from "./pages/Invoices";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile, loading } = useAuth();
@@ -244,7 +246,8 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          {/* Add more routes as pages are implemented */}
+          <Route path="/certificates" element={<ProtectedRoute><Certificates /></ProtectedRoute>} />
+          <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

@@ -1,21 +1,21 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
-  LayoutDashboard, 
-  Send, 
-  Layers, 
-  ClipboardCheck, 
-  Clock, 
-  FileText, 
-  History, 
-  Mail, 
-  CheckSquare, 
-  Users, 
-  Brain, 
-  Book, 
-  PieChart, 
-  HeartPulse, 
-  UserCircle, 
+  LayoutDashboard,
+  Send,
+  Layers,
+  ClipboardCheck,
+  Clock,
+  FileText,
+  History,
+  Mail,
+  CheckSquare,
+  Users,
+  Brain,
+  Book,
+  PieChart,
+  HeartPulse,
+  UserCircle,
   Settings,
   LogOut,
   Rocket,
@@ -27,7 +27,9 @@ import {
   Menu,
   X,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Award,
+  Receipt
 } from "lucide-react";
 import { useAuth } from "../lib/AuthContext";
 import { auth } from "../lib/firebase";
@@ -44,6 +46,8 @@ const menuItems = [
   { id: "audit-center", label: "Audit Center", icon: ClipboardCheck, path: "/audit-center", category: "Compliance" },
   { id: "history", label: "Learner History", icon: Clock, path: "/history", category: "Intelligence" },
   { id: "financial", label: "Financial Communications", icon: FileText, path: "/financial-communications", category: "Operations" },
+  { id: "invoices", label: "Invoices", icon: Receipt, path: "/invoices", category: "Operations" },
+  { id: "certificates", label: "Certificates", icon: Award, path: "/certificates", category: "Operations" },
   { id: "audit-log", label: "Audit Log", icon: History, path: "/audit-log", category: "Compliance" },
   { id: "email-activities", label: "Email Activities", icon: Mail, path: "/email-activities", category: "Operations" },
   { id: "tasks", label: "Tasks", icon: CheckSquare, path: "/tasks", category: "Core" },

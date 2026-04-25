@@ -4,12 +4,12 @@ import { CalendarService } from "./calendar.js";
 import { CacheManager } from "../lib/cache.js";
 import { getServiceAccount } from "../lib/serviceAccount.js";
 
-// Spreadsheet IDs
+// Spreadsheet IDs — env vars with hardcoded fallbacks
 export const SPREADSHEET_IDS = {
-  MIGRATION: "1xzprj2U6NpJwoevBMvM1DVfIj76wVjAd0ZcMjVC1xMM",
-  PERSONA:   "1rSweVyLKEwb1xThFHMLoH4xWnrLs8wbRM_61VtRjGww",
-  AUDIT:     "1iNrejNX3HA01UqYEch94HuKLQCffSPofB8KbD4D9sI4",
-  APP_DATA:  "1XxC8Y0sWkBqoOa0Ntw6zhd5EYXTvaTAN4XhIH1hOwDE",
+  MIGRATION: process.env.SHEET_ID_MIGRATION || "1xzprj2U6NpJwoevBMvM1DVfIj76wVjAd0ZcMjVC1xMM",
+  PERSONA:   process.env.SHEET_ID_PERSONA   || "1rSweVyLKEwb1xThFHMLoH4xWnrLs8wbRM_61VtRjGww",
+  AUDIT:     process.env.SHEET_ID_AUDIT     || "1iNrejNX3HA01UqYEch94HuKLQCffSPofB8KbD4D9sI4",
+  APP_DATA:  process.env.SHEET_ID_APP_DATA  || "1XxC8Y0sWkBqoOa0Ntw6zhd5EYXTvaTAN4XhIH1hOwDE",
 };
 
 // Sheet names

@@ -427,5 +427,29 @@ export function createApp() {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
+  // ── Certificates ─────────────────────────────────────────────
+  app.post("/api/certificates/send", async (req, res) => {
+    try {
+      const { CertificateService } = await import("./services/certificate.js");
+      const { jlid, learnerName, courseName, parentEmail, parentName, sentBy } = req.body;
+      res.json(await CertificateService.sendCertificateEmail(jlid, learnerName, courseName, parentEmail, parentName, sentBy));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post("/api/certificates/bulk", async (req, res) => {
+    try {
+      const { CertificateService } = await import("./services/certificate.js");
+      const { jlid, learnerName, courses, parentEmail, parentName, sentBy } = req.body;
+      res.json(await CertificateService.sendBulkCertificates(jlid, learnerName, courses, parentEmail, parentName, sentBy));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.get("/api/certificates/log", async (req, res) => {
+    try {
+      const { CertificateService } = await import("./services/certificate.js");
+      res.json(await CertificateService.getCertificateLog(Number(req.query.limit || 50)));
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
   return app;
 }
