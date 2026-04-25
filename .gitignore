@@ -7,5 +7,5 @@ coverage/
 .env*
 !.env.example
 google-service-account.json
-
 .vercel
+sa_b64.txt

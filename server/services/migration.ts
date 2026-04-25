@@ -14,20 +14,31 @@ let _db: Firestore | null = null;
 function getDb(): Firestore {
   if (!_db) {
     if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(getServiceAccount() as admin.ServiceAccount),
-        projectId: firebaseConfig.projectId,
-      });
+      try {
+        admin.initializeApp({
+          credential: admin.credential.cert(getServiceAccount() as admin.ServiceAccount),
+          projectId: firebaseConfig.projectId,
+        });
+      } catch (e: any) {
+        if (e.message?.includes("invalid_grant") || e.message?.includes("Invalid JWT")) {
+          throw new Error(
+            "Google service account key is invalid or expired. " +
+            "Rotate the key at console.cloud.google.com and update GOOGLE_SERVICE_ACCOUNT_B64 in Vercel."
+          );
+        }
+        throw e;
+      }
     }
     _db = getFirestore(firebaseConfig.firestoreDatabaseId);
   }
   return _db;
 }
 
+// Spreadsheet IDs — read from env vars, fall back to defaults for backwards compatibility
 const SPREADSHEET_IDS = {
-  MIGRATION: "1xzprj2U6NpJwoevBMvM1DVfIj76wVjAd0ZcMjVC1xMM",
-  PERSONA: "1rSweVyLKEwb1xThFHMLoH4xWnrLs8wbRM_61VtRjGww",
-  AUDIT: "1iNrejNX3HA01UqYEch94HuKLQCffSPofB8KbD4D9sI4",
+  MIGRATION: process.env.SHEET_ID_MIGRATION || "1xzprj2U6NpJwoevBMvM1DVfIj76wVjAd0ZcMjVC1xMM",
+  PERSONA:   process.env.SHEET_ID_PERSONA   || "1rSweVyLKEwb1xThFHMLoH4xWnrLs8wbRM_61VtRjGww",
+  AUDIT:     process.env.SHEET_ID_AUDIT     || "1iNrejNX3HA01UqYEch94HuKLQCffSPofB8KbD4D9sI4",
 };
 
 export class MigrationService {

@@ -51,7 +51,13 @@ export const Login: React.FC = () => {
       const lookupPayload = await lookupResponse.json();
 
       if (!lookupResponse.ok) {
-        setError(lookupPayload.error || "Username not found. Please check and try again.");
+        const serverErr = lookupPayload.error || "";
+        // Translate server-side credential errors to user-friendly messages
+        if (serverErr.includes("invalid_grant") || serverErr.includes("Invalid JWT") || serverErr.includes("service account")) {
+          setError("System configuration error. Please contact your administrator.");
+        } else {
+          setError(serverErr || "Username not found. Please check and try again.");
+        }
         return;
       }
 
